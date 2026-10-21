@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up start down restart logs shell console composer check-cache
+.PHONY: help install up start down restart logs shell console composer check-cache seed
 
 COMPOSE := docker compose
 
@@ -34,3 +34,6 @@ composer: ## Run a Composer command, e.g. make composer c="require foo/bar"
 
 check-cache: ## Show cache headers from Varnish
 	@curl -sI http://localhost:8080/ | grep -iE "x-cache|cache-control|age"
+
+seed: ## Recreate the schema and seed deterministic content
+	$(COMPOSE) exec app php bin/console app:seed
