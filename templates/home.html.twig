@@ -4,5 +4,5 @@
 
 {% block body %}
     <h1>Latest news</h1>
-    {{ include('_article_list.html.twig') }}
+    {{ render_esi(path('esi_latest')) }}
 {% endblock %}

@@ -6,5 +6,5 @@
 
 {% block body %}
     <h1>Articles by {{ author.name }}</h1>
-    {{ include('_article_list.html.twig') }}
+    {{ render_esi(path('esi_author', {id: author.id})) }}
 {% endblock %}

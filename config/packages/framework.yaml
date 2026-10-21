@@ -1,2 +1,4 @@
 framework:
     secret: '%env(APP_SECRET)%'
+    # Listings are ESI fragments assembled by Varnish (rendered inline when no surrogate is in front).
+    esi: true

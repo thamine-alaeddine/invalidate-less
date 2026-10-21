@@ -41,12 +41,21 @@ sub vcl_recv {
 
         return (synth(200, "Purged " + req.http.n-gone + " objects"));
     }
+
+    # Tell Symfony that Varnish processes ESI, so listings come back as <esi:include> tags.
+    set req.http.Surrogate-Capability = "abc=ESI/1.0";
 }
 
 sub vcl_backend_response {
     # Store URL and host on the object for lurker-friendly bans.
     set beresp.http.X-Url = bereq.url;
     set beresp.http.X-Host = bereq.http.host;
+
+    # Symfony marks responses containing <esi:include> with Surrogate-Control.
+    if (beresp.http.Surrogate-Control ~ "ESI/1.0") {
+        unset beresp.http.Surrogate-Control;
+        set beresp.do_esi = true;
+    }
 }
 
 sub vcl_deliver {

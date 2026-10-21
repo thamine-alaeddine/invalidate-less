@@ -14,7 +14,7 @@ final class TagInvalidator implements ArticleInvalidator
 
     public function invalidateArticle(Article $article): void
     {
-        $this->cacheManager->invalidateTags(ArticleTags::of($article));
+        $this->cacheManager->invalidateTags(CacheTags::articles($article));
         $this->cacheManager->flush();
     }
 }

@@ -14,6 +14,6 @@
     </article>
     <aside>
         <h2>More in {{ article.category.name }}</h2>
-        {{ include('_article_list.html.twig', {articles: related}) }}
+        {{ render_esi(path('esi_related', {id: article.category.id, exclude: article.id})) }}
     </aside>
 {% endblock %}
