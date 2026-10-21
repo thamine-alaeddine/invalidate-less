@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats
+.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats strategy-full strategy-tags strategy
 
 COMPOSE := docker compose
 
@@ -43,3 +43,12 @@ update-article: ## Update one article and invalidate the cache, e.g. make update
 
 varnish-stats: ## Show Varnish hit, miss, ban and object counters
 	$(COMPOSE) exec varnish varnishstat -1 -f MAIN.cache_hit -f MAIN.cache_miss -f MAIN.bans -f MAIN.n_object
+
+strategy-full: ## Switch to strategy A: ban the whole Varnish cache on article update
+	INVALIDATION_STRATEGY=full $(COMPOSE) up -d app
+
+strategy-tags: ## Switch to strategy B: purge only pages tagged with the updated article
+	INVALIDATION_STRATEGY=tags $(COMPOSE) up -d app
+
+strategy: ## Show the active invalidation strategy
+	@$(COMPOSE) exec app printenv INVALIDATION_STRATEGY

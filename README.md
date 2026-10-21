@@ -74,13 +74,13 @@ make check-cache
 
 The first request shows `X-Cache: MISS`, the next ones `X-Cache: HIT` (pages stay cached for 1 hour for articles and 1 day for the other pages, unless invalidated).
 
-Update an article and watch the cache get purged. The strategy is chosen with `INVALIDATION_STRATEGY` when starting the containers:
+Update an article and watch the cache get purged. Pick the strategy first:
 
 - `full` (default): strategy A, bans the whole Varnish cache
 - `tags`: strategy B, purges only the pages showing that article (Varnish xkey)
 
 ```bash
-INVALIDATION_STRATEGY=tags make start   # switch strategy (recreates the app container)
+make strategy-tags   # or make strategy-full; make strategy shows the active one
 
 make update-article id=1
 # or, as the k6 editor will do:
@@ -109,6 +109,9 @@ Run `make` to list them all.
 | `make seed` | Recreate the schema and seed deterministic content |
 | `make update-article id=42` | Update one article and invalidate the cache |
 | `make varnish-stats` | Show Varnish hit, miss, ban and object counters |
+| `make strategy-full` | Switch to strategy A (full purge) |
+| `make strategy-tags` | Switch to strategy B (tag-based purge) |
+| `make strategy` | Show the active invalidation strategy |
 
 ## Project structure
 
