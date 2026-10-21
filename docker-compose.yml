@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    environment:
+      # Plain HTTP on port 80 inside the container (no automatic HTTPS)
+      SERVER_NAME: ":80"
+    volumes:
+      - ./:/app
+    ports:
+      - "8002:80"   # direct access to Symfony, bypassing the cache
+
+  varnish:
+    image: varnish:7.7
+    depends_on:
+      - app
+    environment:
+      VARNISH_SIZE: 256M
+    volumes:
+      - ./docker/varnish/default.vcl:/etc/varnish/default.vcl:ro
+    ports:
+      - "8082:80"   # the site as readers see it, through Varnish
