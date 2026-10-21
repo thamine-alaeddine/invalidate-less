@@ -1,0 +1,5 @@
+<span class="meta">
+    {{ article.publishedAt|date('Y-m-d H:i') }}
+    <a class="link-category" href="{{ path('category', {slug: article.category.slug}) }}">{{ article.category.name }}</a>
+    <a class="link-author" href="{{ path('author', {slug: article.author.slug}) }}">{{ article.author.name }}</a>
+</span>

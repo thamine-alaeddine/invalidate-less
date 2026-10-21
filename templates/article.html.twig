@@ -1,17 +1,13 @@
 {% extends 'base.html.twig' %}
 
+{% block page_type %}article{% endblock %}
+
 {% block title %}{{ article.title }}{% endblock %}
 
 {% block body %}
     <article>
         <h1>{{ article.title }}</h1>
-        <p>
-            <small>
-                {{ article.publishedAt|date('Y-m-d H:i') }}
-                · <a href="{{ path('category', {slug: article.category.slug}) }}">{{ article.category.name }}</a>
-                · <a href="{{ path('author', {slug: article.author.slug}) }}">{{ article.author.name }}</a>
-            </small>
-        </p>
+        {{ include('_meta.html.twig') }}
         {% for paragraph in article.body|split("\n\n") %}
             <p>{{ paragraph }}</p>
         {% endfor %}

@@ -2,21 +2,67 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}invalidate-less{% endblock %} · invalidate-less</title>
+    {# Inline on purpose: one request per page keeps benchmark traffic HTML-only. #}
+    <style>
+        :root {
+            --c-home: #2563eb;
+            --c-category: #16a34a;
+            --c-author: #9333ea;
+            --c-article: #ea580c;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --border: #e2e8f0;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8; --border: #334155; }
+        }
+        .type-home { --accent: var(--c-home); }
+        .type-category { --accent: var(--c-category); }
+        .type-author { --accent: var(--c-author); }
+        .type-article { --accent: var(--c-article); }
+
+        body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        .wrap { max-width: 48rem; margin: 0 auto; padding: 0 1rem; }
+        a { color: inherit; }
+        header { background: var(--card); border-top: 6px solid var(--accent); border-bottom: 1px solid var(--border); padding: 1rem 0; }
+        .brand { display: flex; align-items: center; gap: .75rem; margin: 0 0 .5rem; }
+        .brand a { font-weight: 700; text-decoration: none; }
+        .badge { background: var(--accent); color: #fff; border-radius: 999px; padding: .1rem .6rem; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+        nav { display: flex; flex-wrap: wrap; gap: .35rem; }
+        h1 { color: var(--accent); line-height: 1.25; }
+        h2 { font-size: 1.1rem; }
+        ul { list-style: none; padding: 0; }
+        li { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--c-article); border-radius: 6px; padding: .6rem .8rem; margin-bottom: .5rem; }
+        .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; color: var(--muted); font-size: .85rem; }
+        .link-article { color: var(--c-article); font-weight: 600; text-decoration: none; }
+        .link-category, .link-author { border-radius: 4px; padding: 0 .4rem; font-size: .8rem; text-decoration: none; color: #fff; }
+        .link-category { background: var(--c-category); }
+        .link-author { background: var(--c-author); }
+        footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+    </style>
 </head>
-<body>
+<body class="type-{% block page_type %}home{% endblock %}">
     <header>
-        <p><a href="{{ path('home') }}"><strong>invalidate-less</strong></a></p>
-        <nav>
-            {% for category in nav_categories() %}
-                <a href="{{ path('category', {slug: category.slug}) }}">{{ category.name }}</a>{{ not loop.last ? ' · ' }}
-            {% endfor %}
-        </nav>
+        <div class="wrap">
+            <p class="brand">
+                <a href="{{ path('home') }}">invalidate-less</a>
+                <span class="badge">{{ block('page_type') }}</span>
+            </p>
+            <nav>
+                {% for category in nav_categories() %}
+                    <a class="link-category" href="{{ path('category', {slug: category.slug}) }}">{{ category.name }}</a>
+                {% endfor %}
+            </nav>
+        </div>
     </header>
-    <main>
+    <main class="wrap">
         {% block body %}{% endblock %}
     </main>
-    <footer>
+    <footer class="wrap">
         {# Unchanged timestamp on reload means the page came from the cache. #}
         <p>Page generated at <strong>{{ 'now'|date('H:i:s.v') }}</strong>.</p>
     </footer>

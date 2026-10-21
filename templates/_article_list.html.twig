@@ -1,12 +1,8 @@
 <ul>
     {% for article in articles %}
         <li>
-            <a href="{{ path('article', {slug: article.slug}) }}">{{ article.title }}</a>
-            <small>
-                {{ article.publishedAt|date('Y-m-d H:i') }}
-                · <a href="{{ path('category', {slug: article.category.slug}) }}">{{ article.category.name }}</a>
-                · <a href="{{ path('author', {slug: article.author.slug}) }}">{{ article.author.name }}</a>
-            </small>
+            <a class="link-article" href="{{ path('article', {slug: article.slug}) }}">{{ article.title }}</a>
+            {{ include('_meta.html.twig') }}
         </li>
     {% endfor %}
 </ul>
