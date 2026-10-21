@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up start down restart logs shell console composer check-cache seed
+.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats
 
 COMPOSE := docker compose
 
@@ -37,3 +37,9 @@ check-cache: ## Show cache headers from Varnish
 
 seed: ## Recreate the schema and seed deterministic content
 	$(COMPOSE) exec app php bin/console app:seed
+
+update-article: ## Update one article and invalidate the cache, e.g. make update-article id=42
+	$(COMPOSE) exec app php bin/console app:article:update $(id)
+
+varnish-stats: ## Show Varnish hit, miss, ban and object counters
+	$(COMPOSE) exec varnish varnishstat -1 -f MAIN.cache_hit -f MAIN.cache_miss -f MAIN.bans -f MAIN.n_object

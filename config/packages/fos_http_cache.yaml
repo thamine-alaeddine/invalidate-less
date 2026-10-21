@@ -1,0 +1,11 @@
+fos_http_cache:
+    proxy_client:
+        varnish:
+            http:
+                servers: ['varnish:80']
+                base_url: 'varnish'
+    # Tags come with strategy B (week 4).
+    tags:
+        enabled: false
+    debug:
+        enabled: false

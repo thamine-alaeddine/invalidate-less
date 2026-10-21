@@ -17,6 +17,9 @@ class Article
     #[ORM\Column]
     private \DateTimeImmutable $updatedAt;
 
+    #[ORM\Column]
+    private int $revision = 1;
+
     public function __construct(
         #[ORM\Column(length: 200, unique: true)]
         private string $slug,
@@ -32,6 +35,12 @@ class Article
         private Author $author,
     ) {
         $this->updatedAt = $publishedAt;
+    }
+
+    public function edit(\DateTimeImmutable $now): void
+    {
+        ++$this->revision;
+        $this->updatedAt = $now;
     }
 
     public function getId(): ?int
@@ -72,5 +81,10 @@ class Article
     public function getAuthor(): Author
     {
         return $this->author;
+    }
+
+    public function getRevision(): int
+    {
+        return $this->revision;
     }
 }
