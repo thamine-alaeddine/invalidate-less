@@ -31,7 +31,7 @@ During each benchmark run:
 | **B. Tag-based purge** | Purge only what is tagged with the change (Varnish xkey): the article and listing fragments showing it on update, the listings it enters on publish |
 | **C. Tag-based + CDN** | Strategy B, plus translating tags into the URL list sent to a CloudFront invalidation |
 
-A and B keep long TTLs (1 hour for articles, 1 day elsewhere) because purges keep content fresh. TTL only trades freshness for simplicity: readers can see content up to 60 s old, plus Varnish's 10 s default grace. Staleness is not measured yet, so compare its numbers with that in mind.
+A and B keep long TTLs (1 hour for articles, 1 day elsewhere) because purges keep content fresh. TTL only trades freshness for simplicity: readers can see content up to 60 s old, plus Varnish's 10 s default grace. The benchmark measures this staleness (see "visible after" below).
 
 ## Metrics
 
@@ -125,20 +125,21 @@ Run `make` to list them all.
 ### Running a benchmark
 
 ```bash
-make bench-all                                  # strategy A then B, default settings
+make bench-all                                  # full, tags, then ttl, default settings
 make bench strategy=tags                        # one strategy
-READERS=100 DURATION=5m make bench-all          # tuned
+RATE=2000 DURATION=5m make bench-all            # tuned
 ```
 
-Each run is isolated and reproducible: it recreates the containers on the chosen strategy, reseeds the same data, empties Varnish, warms the cache with readers only, then measures. k6 runs in Docker (`grafana/k6`), so nothing else needs installing.
+Each run is isolated and reproducible: it recreates the containers on the chosen strategy, reseeds the same data, empties Varnish, warms the cache with readers only, then measures. Readers send a fixed number of requests per second (open model), whatever the response times, so every strategy serves the same load. k6 runs in Docker (`grafana/k6`), so nothing else needs installing.
 
 | Setting (env) | Default | Meaning |
 |---|---|---|
-| `READERS` | 50 | concurrent readers, browsing without pause through Varnish |
+| `RATE` | 1000 | reader requests per second through Varnish |
 | `DURATION` | 3m | measured run length |
 | `WARMUP_DURATION` | 30s | readers-only warm-up before measuring |
 | `EDIT_EVERY` | 10 | seconds between editor actions (on the origin) |
 | `PUBLISH_EVERY` | 6 | every Nth editor action publishes a new article; the others update one |
+| `PROBE_TIMEOUT` | 120 | seconds a freshness probe waits for a change to show up before giving up |
 | `SEED` | 42 | random seed for the readers' page sequence |
 | `SHORT_TTL` | 60 | shared TTL in seconds for the `ttl` strategy |
 
@@ -146,8 +147,9 @@ Readers' page mix: 15% home, 20% category, 10% author, 55% article; 80% of artic
 
 Results print at the end and are appended to `bench/results/results.md` (raw k6 summary JSON next to it):
 
-- **Reader req/s, p50, p95**: k6, reader requests only
-- **Origin req/s**: Varnish `MAIN.backend_req` delta over the run (page shells and ESI fragments)
+- **Reader req/s, p50, p95**: k6, reader requests only. **Dropped** counts reader requests k6 could not start in time; if it is not 0, the target rate was too high for the machine
+- **Update / publish visible p95**: after each editor action, the editor polls the page through Varnish every 0.5 s until the change shows (the article's own page for an update, the home page's latest list for a publish) and records the delay. This is the staleness readers experience; **probe timeouts** count changes not visible within `PROBE_TIMEOUT`
+- **Origin req/s**: Varnish `MAIN.backend_req` delta over the readers' window (page shells, ESI fragments and background refreshes)
 - **Hit ratio**: `cache_hit / (cache_hit + cache_miss)` delta, counting every ESI fragment lookup
 - **Origin CPU**: average of `docker stats` samples for the app container (100% = one core)
 

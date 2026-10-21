@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Runs one benchmark for a strategy: fresh data, empty cache, warm-up, measured k6 run, Varnish/CPU deltas.
-# Usage: bench/run.sh full|tags|ttl   (tuning via env: READERS, DURATION, WARMUP_DURATION, EDIT_EVERY, PUBLISH_EVERY, SEED, SHORT_TTL)
+# Usage: bench/run.sh full|tags|ttl
+# Tuning via env: RATE, DURATION, WARMUP_DURATION, EDIT_EVERY, PUBLISH_EVERY, PROBE_TIMEOUT, SEED, SHORT_TTL
 set -euo pipefail
 
 STRATEGY="${1:?usage: bench/run.sh full|tags|ttl}"
-READERS="${READERS:-50}"
+RATE="${RATE:-1000}"
 DURATION="${DURATION:-3m}"
 WARMUP_DURATION="${WARMUP_DURATION:-30s}"
 EDIT_EVERY="${EDIT_EVERY:-10}"
 PUBLISH_EVERY="${PUBLISH_EVERY:-6}"
+PROBE_TIMEOUT="${PROBE_TIMEOUT:-120}"
 SEED="${SEED:-42}"
 # Exported so every compose call keeps the app on this strategy.
 export INVALIDATION_STRATEGY="$STRATEGY"
@@ -17,15 +19,34 @@ export SHORT_TTL="${SHORT_TTL:-60}"
 cd "$(dirname "$0")/.."
 RESULTS=bench/results
 STAMP="$(date +%Y%m%d-%H%M%S)"
+SUMMARY="$RESULTS/$STAMP-$STRATEGY.json"
 mkdir -p "$RESULTS"
+
+# "3m", "90s", "1m30s" or plain seconds.
+seconds() {
+    local d="$1" m=0 s=0
+    [[ "$d" =~ ^([0-9]+)m ]] && m="${BASH_REMATCH[1]}"
+    [[ "$d" =~ ([0-9]+)s$ ]] && s="${BASH_REMATCH[1]}"
+    [[ "$d" =~ ^[0-9]+$ ]] && s="$d"
+    echo $(( m * 60 + s ))
+}
+RUN_SECONDS="$(seconds "$DURATION")"
 
 compose() { docker compose "$@"; }
 console() { compose exec -T app php bin/console "$@"; }
 stats() { compose exec -T varnish varnishstat -1 -j; }
-counter() { jq -r --arg c "$2" '(.counters // .)[$c].value' <<<"$1"; }
-k6() { compose --profile bench run --rm --no-deps -e READERS="$READERS" -e EDIT_EVERY="$EDIT_EVERY" -e PUBLISH_EVERY="$PUBLISH_EVERY" -e SEED="$SEED" "$@"; }
+counter() { jq -r --arg c "$2" '(.counters // .)[$c].value' "$1"; }
+# --no-deps: otherwise compose re-creates the app without our environment.
+k6() {
+    compose --profile bench run --rm --no-deps \
+        -e RATE="$RATE" -e EDIT_EVERY="$EDIT_EVERY" -e PUBLISH_EVERY="$PUBLISH_EVERY" \
+        -e PROBE_TIMEOUT="$PROBE_TIMEOUT" -e SEED="$SEED" "$@"
+}
+metric() { jq -r --arg m "$1" --arg v "$2" '.metrics[$m].values[$v] // empty' "$SUMMARY"; }
+# Divides $1 by $2 with $3 decimals (default 1), or prints n/a when the metric is missing.
+fmt() { if [ -n "$1" ]; then awk -v x="$1" -v d="$2" -v p="${3:-1}" 'BEGIN { printf "%.*f", p, x / d }'; else echo "n/a"; fi; }
 
-echo "==> strategy=$STRATEGY short_ttl=${SHORT_TTL}s readers=$READERS duration=$DURATION warmup=$WARMUP_DURATION edit_every=${EDIT_EVERY}s publish_every=$PUBLISH_EVERY"
+echo "==> strategy=$STRATEGY short_ttl=${SHORT_TTL}s rate=${RATE}/s duration=$DURATION warmup=$WARMUP_DURATION edit_every=${EDIT_EVERY}s publish_every=$PUBLISH_EVERY"
 
 echo "==> Fresh containers (strategy $STRATEGY, empty Varnish cache)"
 compose up -d --force-recreate app varnish >/dev/null 2>&1
@@ -39,51 +60,52 @@ compose restart varnish >/dev/null 2>&1
 sleep 2
 
 echo "==> Warm-up ($WARMUP_DURATION, readers only)"
-k6 -e WARMUP=1 -e DURATION="$WARMUP_DURATION" k6 run --quiet scenario.js >/dev/null
+k6 -e WARMUP=1 -e DURATION="$WARMUP_DURATION" k6 run --quiet scenario.js >/dev/null 2>&1 || true
 
-echo "==> Measured run ($DURATION)"
-BEFORE="$(stats)"
-CPU_LOG="$(mktemp)"
+echo "==> Measured run ($DURATION of readers, then the editor's last probes)"
+TMP="$(mktemp -d)"
+trap 'pkill -P $$ 2>/dev/null || true; rm -rf "$TMP"' EXIT
+stats >"$TMP/before.json"
 APP_CONTAINER="$(compose ps -q app)"
-( while true; do docker stats --no-stream --format '{{.CPUPerc}}' "$APP_CONTAINER" | tr -d '%' >>"$CPU_LOG"; done ) &
-CPU_PID=$!
-trap 'kill $CPU_PID 2>/dev/null || true' EXIT
 
-SUMMARY="$RESULTS/$STAMP-$STRATEGY.json"
-k6 -e DURATION="$DURATION" -e SUMMARY_FILE="/bench/results/$STAMP-$STRATEGY.json" k6 run --quiet scenario.js \
+# Varnish counters and CPU cover the readers' window only, not the probes' tail.
+(
+    end=$(( $(date +%s) + RUN_SECONDS ))
+    while [ "$(date +%s)" -lt "$end" ]; do
+        docker stats --no-stream --format '{{.CPUPerc}}' "$APP_CONTAINER" | tr -d '%' >>"$TMP/cpu.log"
+    done
+) &
+( sleep "$RUN_SECONDS"; stats >"$TMP/after.json" ) &
+
+k6 -e DURATION="$DURATION" -e SUMMARY_FILE="/bench/results/$STAMP-$STRATEGY.json" k6 run --quiet scenario.js 2>/dev/null \
     || echo "!! k6 thresholds failed (see above); results still recorded"
+wait
 
-# Stop the sampler and its running docker stats child.
-pkill -P $CPU_PID 2>/dev/null || true
-kill $CPU_PID 2>/dev/null || true
-wait $CPU_PID 2>/dev/null || true
-AFTER="$(stats)"
-
-delta() { echo $(( $(counter "$AFTER" "$1") - $(counter "$BEFORE" "$1") )); }
+delta() { echo $(( $(counter "$TMP/after.json" "$1") - $(counter "$TMP/before.json" "$1") )); }
 HITS=$(delta MAIN.cache_hit)
 MISSES=$(delta MAIN.cache_miss)
 BACKEND=$(delta MAIN.backend_req)
-SECONDS_RUN=$(jq '.state.testRunDurationMs / 1000 | floor' "$SUMMARY")
-P50=$(jq '.metrics["http_req_duration{scenario:readers}"].values.med' "$SUMMARY")
-P95=$(jq '.metrics["http_req_duration{scenario:readers}"].values["p(95)"]' "$SUMMARY")
-READER_RPS=$(jq '.metrics["http_reqs{scenario:readers}"].values.rate' "$SUMMARY")
-CPU_AVG=$(awk '{ s += $1; n++ } END { if (n) printf "%.1f", s / n; else print "n/a" }' "$CPU_LOG")
-rm -f "$CPU_LOG"
 
-ORIGIN_RPS=$(awk -v b="$BACKEND" -v s="$SECONDS_RUN" 'BEGIN { printf "%.1f", b / s }')
+READER_RPS=$(fmt "$(metric 'http_reqs{scenario:readers}' count)" "$RUN_SECONDS")
+DROPPED=$(metric 'dropped_iterations{scenario:readers}' count); DROPPED=${DROPPED:-0}
+P50=$(fmt "$(metric 'http_req_duration{scenario:readers}' med)" 1)
+P95=$(fmt "$(metric 'http_req_duration{scenario:readers}' 'p(95)')" 1)
+UPDATE_P95=$(fmt "$(metric update_visible_after 'p(95)')" 1000 2)
+PUBLISH_P95=$(fmt "$(metric publish_visible_after 'p(95)')" 1000 2)
+TIMEOUTS=$(metric probe_timeouts count); TIMEOUTS=${TIMEOUTS:-0}
+ORIGIN_RPS=$(fmt "$BACKEND" "$RUN_SECONDS")
 HIT_RATIO=$(awk -v h="$HITS" -v m="$MISSES" 'BEGIN { printf "%.1f", (h + m) ? 100 * h / (h + m) : 0 }')
-P50=$(printf '%.1f' "$P50"); P95=$(printf '%.1f' "$P95"); READER_RPS=$(printf '%.1f' "$READER_RPS")
+CPU_AVG=$(awk '{ s += $1; n++ } END { if (n) printf "%.1f", s / n; else print "n/a" }' "$TMP/cpu.log")
 
-ROW="| $STAMP | $STRATEGY | $READERS | $DURATION | $READER_RPS | $ORIGIN_RPS | $HIT_RATIO% | $P50 | $P95 | $CPU_AVG% |"
 TABLE="$RESULTS/results.md"
-if [ ! -f "$TABLE" ]; then
+if [ ! -f "$TABLE" ] || ! grep -q "Target req/s" "$TABLE"; then
     {
-        echo "| Run | Strategy | Readers | Duration | Reader req/s | Origin req/s | Hit ratio | p50 (ms) | p95 (ms) | Origin CPU |"
-        echo "|---|---|---|---|---|---|---|---|---|---|"
+        echo "| Run | Strategy | Target req/s | Reader req/s | Dropped | Origin req/s | Hit ratio | p50 (ms) | p95 (ms) | Origin CPU | Update visible p95 (s) | Publish visible p95 (s) | Probe timeouts |"
+        echo "|---|---|---|---|---|---|---|---|---|---|---|---|---|"
     } >"$TABLE"
 fi
-echo "$ROW" >>"$TABLE"
+echo "| $STAMP | $STRATEGY | $RATE | $READER_RPS | $DROPPED | $ORIGIN_RPS | $HIT_RATIO% | $P50 | $P95 | $CPU_AVG% | $UPDATE_P95 | $PUBLISH_P95 | $TIMEOUTS |" >>"$TABLE"
 
 echo "==> Result (also appended to $TABLE)"
 echo "active strategy in app: $(compose exec -T app printenv INVALIDATION_STRATEGY)"
-echo "strategy $STRATEGY: origin ${ORIGIN_RPS} req/s, hit ratio ${HIT_RATIO}%, p50 ${P50} ms, p95 ${P95} ms, origin CPU ${CPU_AVG}% (hits $HITS, misses $MISSES, backend requests $BACKEND over ${SECONDS_RUN}s)"
+echo "strategy $STRATEGY: origin ${ORIGIN_RPS} req/s, hit ratio ${HIT_RATIO}%, p50 ${P50} ms, p95 ${P95} ms, origin CPU ${CPU_AVG}%, update visible p95 ${UPDATE_P95} s, publish visible p95 ${PUBLISH_P95} s (hits $HITS, misses $MISSES, backend requests $BACKEND over ${RUN_SECONDS}s, dropped $DROPPED, probe timeouts $TIMEOUTS)"

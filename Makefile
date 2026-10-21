@@ -59,7 +59,7 @@ strategy: ## Show the active invalidation strategy
 publish-article: ## Publish a new article and invalidate the cache, e.g. make publish-article (optional category=3 author=7)
 	$(COMPOSE) exec app php bin/console app:article:publish $(if $(category),--category=$(category)) $(if $(author),--author=$(author))
 
-bench: ## Run one benchmark, e.g. make bench strategy=tags (env: READERS, DURATION, WARMUP_DURATION, EDIT_EVERY, PUBLISH_EVERY, SEED)
+bench: ## Run one benchmark, e.g. make bench strategy=tags (env: RATE, DURATION, WARMUP_DURATION, EDIT_EVERY, PUBLISH_EVERY, PROBE_TIMEOUT, SEED, SHORT_TTL)
 	bench/run.sh $(or $(strategy),full)
 
 bench-all: ## Run the benchmark for every strategy, one after the other
