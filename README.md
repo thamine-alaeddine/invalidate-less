@@ -72,7 +72,18 @@ Check that caching works:
 make check-cache
 ```
 
-The first request shows `X-Cache: MISS`, the next ones `X-Cache: HIT` for 60 seconds.
+The first request shows `X-Cache: MISS`, the next ones `X-Cache: HIT` (pages stay cached for 1 hour for articles and 1 day for the other pages, unless invalidated).
+
+Update an article and watch the cache get purged (strategy A bans the whole Varnish cache):
+
+```bash
+make update-article id=1
+# or, as the k6 editor will do:
+curl -X POST http://localhost:8002/editor/articles/1
+
+make check-cache    # MISS again, then HIT
+make varnish-stats  # hits, misses, bans
+```
 
 ### Make commands
 
@@ -91,6 +102,8 @@ Run `make` to list them all.
 | `make composer c="require foo/bar"` | Run a Composer command |
 | `make check-cache` | Show cache headers from Varnish |
 | `make seed` | Recreate the schema and seed deterministic content |
+| `make update-article id=42` | Update one article and invalidate the cache |
+| `make varnish-stats` | Show Varnish hit, miss, ban and object counters |
 
 ## Project structure
 
@@ -101,7 +114,8 @@ Run `make` to list them all.
 ├── src/Command/            Console commands (`app:seed`)
 ├── src/Controller/         Page controllers (home, category, author, article)
 ├── src/Entity/             Doctrine entities (Article, Category, Author)
-├── src/EventSubscriber/    Cache headers for every page
+├── src/Cache/              Invalidation strategies
+├── src/Editor/             Article update service (endpoint + CLI)
 ├── templates/              Twig templates
 ├── docker-compose.yml      app (Symfony on FrankenPHP) + Varnish
 ├── Dockerfile              PHP image for the app
