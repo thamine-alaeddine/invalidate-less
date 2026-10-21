@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Reproducible benchmark: **full cache purge** vs **tag-based invalidation** on a fake news site (Symfony 7.4 + Varnish 7 + CloudFront). See README.md for the scenario, metrics and milestones. Weeks 1–3 are done (content model, seed data, all page types, editor, strategy A); strategy B (xkey), k6 and CloudFront are not built yet.
+Reproducible benchmark: **full cache purge** vs **tag-based invalidation** on a fake news site (Symfony 7.4 + Varnish 7 + CloudFront). See README.md for the scenario, metrics and milestones. Weeks 1–4 are done (content model, seed data, all page types, editor, strategies A and B); k6 and CloudFront are not built yet.
 
 Three strategies being compared, all triggered by an article update:
 - **A. Full purge**: ban the whole Varnish cache.
@@ -42,9 +42,10 @@ No test suite, linter or static analysis is configured yet.
 - Fan-out of one article change (what purge strategies must handle): its article page, the home page if among latest 20, its category and author pages if among their latest 20, and article pages of the same category showing it under "More in …" (latest 5).
 - No Symfony Flex: bundles go in `config/bundles.php` and config files are written by hand.
 - Editor: `POST /editor/articles/{id}` (`EditorController`, JSON `{id, revision}`) and `app:article:update <id>` both call `src/Editor/ArticleEditor.php`, which bumps `Article::revision`/`updatedAt`, flushes, then runs the invalidation synchronously. Revision is shown on every page listing the article, so a stale page is visible. No auth (frozen scope).
-- Invalidation seam: `App\Cache\ArticleInvalidator`, aliased in `config/services.yaml`. Strategy A = `FullPurgeInvalidator` (FOSHttpCacheBundle `invalidateRegex('.*')` + `flush()`). Week 4 adds the tag implementation behind the same interface.
-- Varnish (`docker/varnish/default.vcl`): `BAN` accepted from Docker private ranges (which includes the host via Docker Desktop), turned into a lurker-friendly ban on `obj.http.X-Url`/`X-Host`/`Content-Type`; those helper headers are stripped in `vcl_deliver`. VCL changes need `docker compose up -d --force-recreate varnish`.
-- FOSHttpCacheBundle needs an HTTPlug async client: provided by `symfony/http-client` + `php-http/httplug` + `guzzlehttp/promises` + `nyholm/psr7`. Its tags and debug header are disabled until week 4.
+- Invalidation seam: `App\Cache\ArticleInvalidator`, aliased in `config/services.yaml` to `ConfiguredInvalidator`, which picks the strategy from the `INVALIDATION_STRATEGY` env var at runtime (`full` = A, `tags` = B; unknown value throws before the editor writes). `FullPurgeInvalidator` bans everything (`invalidateRegex('.*')`); `TagInvalidator` purges the article's tag via xkey. Both call `CacheManager::flush()` so purges are synchronous. Set the strategy with `INVALIDATION_STRATEGY=tags make start` (passed through `docker-compose.yml`, default `full`).
+- Tagging: every page controller tags its response with `ResponseTagger::addTags(ArticleTags::of(...))` for exactly the articles it renders (so the article page computes its related list in the controller, not the template). `src/Cache/ArticleTags.php` owns the tag names (`article-{id}`) for both tagging and purging. Article updates never change list membership (publishedAt is fixed), so article tags alone cover the fan-out.
+- Varnish (`docker/varnish/default.vcl`, `import xkey`): `BAN` (strategy A) and `PURGEKEYS` (strategy B, hard `xkey.purge` on the `xkey-purge` header) accepted from Docker private ranges (which includes the host via Docker Desktop). Bans match `obj.http.X-Url`/`X-Host`/`Content-Type` (lurker-friendly); the app sends tags in an `xkey` response header (FOS `tag_mode: purgekeys`). `X-Url`, `X-Host` and `xkey` are stripped in `vcl_deliver`. VCL changes need `docker compose up -d --force-recreate varnish`.
+- FOSHttpCacheBundle needs an HTTPlug async client: provided by `symfony/http-client` + `php-http/httplug` + `guzzlehttp/promises` + `nyholm/psr7`. Its debug header is disabled.
 
 ## Scope rule
 

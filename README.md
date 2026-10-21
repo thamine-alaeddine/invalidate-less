@@ -74,14 +74,19 @@ make check-cache
 
 The first request shows `X-Cache: MISS`, the next ones `X-Cache: HIT` (pages stay cached for 1 hour for articles and 1 day for the other pages, unless invalidated).
 
-Update an article and watch the cache get purged (strategy A bans the whole Varnish cache):
+Update an article and watch the cache get purged. The strategy is chosen with `INVALIDATION_STRATEGY` when starting the containers:
+
+- `full` (default): strategy A, bans the whole Varnish cache
+- `tags`: strategy B, purges only the pages showing that article (Varnish xkey)
 
 ```bash
+INVALIDATION_STRATEGY=tags make start   # switch strategy (recreates the app container)
+
 make update-article id=1
 # or, as the k6 editor will do:
 curl -X POST http://localhost:8002/editor/articles/1
 
-make check-cache    # MISS again, then HIT
+make check-cache    # MISS again, then HIT (article 1 is on the home page)
 make varnish-stats  # hits, misses, bans
 ```
 
