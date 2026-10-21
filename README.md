@@ -114,10 +114,41 @@ Run `make` to list them all.
 | `make strategy-full` | Switch to strategy A (full purge) |
 | `make strategy-tags` | Switch to strategy B (tag-based purge) |
 | `make strategy` | Show the active invalidation strategy |
+| `make bench strategy=tags` | Run one benchmark for a strategy |
+| `make bench-all` | Run the benchmark for every strategy |
+
+### Running a benchmark
+
+```bash
+make bench-all                                  # strategy A then B, default settings
+make bench strategy=tags                        # one strategy
+READERS=100 DURATION=5m make bench-all          # tuned
+```
+
+Each run is isolated and reproducible: it recreates the containers on the chosen strategy, reseeds the same data, empties Varnish, warms the cache with readers only, then measures. k6 runs in Docker (`grafana/k6`), so nothing else needs installing.
+
+| Setting (env) | Default | Meaning |
+|---|---|---|
+| `READERS` | 50 | concurrent readers, browsing without pause through Varnish |
+| `DURATION` | 3m | measured run length |
+| `WARMUP_DURATION` | 30s | readers-only warm-up before measuring |
+| `EDIT_EVERY` | 10 | seconds between editor actions (on the origin) |
+| `PUBLISH_EVERY` | 6 | every Nth editor action publishes a new article; the others update one |
+| `SEED` | 42 | random seed for the readers' page sequence |
+
+Readers' page mix: 15% home, 20% category, 10% author, 55% article; 80% of article views (and of updates) target the 200 newest articles.
+
+Results print at the end and are appended to `bench/results/results.md` (raw k6 summary JSON next to it):
+
+- **Reader req/s, p50, p95**: k6, reader requests only
+- **Origin req/s**: Varnish `MAIN.backend_req` delta over the run (page shells and ESI fragments)
+- **Hit ratio**: `cache_hit / (cache_hit + cache_miss)` delta, counting every ESI fragment lookup
+- **Origin CPU**: average of `docker stats` samples for the app container (100% = one core)
 
 ## Project structure
 
 ```
+├── bench/                  k6 scenario (scenario.js) and benchmark runner (run.sh)
 ├── config/                 Symfony configuration
 ├── docker/varnish/         Varnish configuration (VCL)
 ├── public/index.php        Symfony front controller
@@ -128,7 +159,7 @@ Run `make` to list them all.
 ├── src/Cache/              Invalidation strategies
 ├── src/Editor/             Article update and publish service (endpoints + CLI)
 ├── templates/              Twig templates
-├── docker-compose.yml      app (Symfony on FrankenPHP) + Varnish
+├── docker-compose.yml      app (Symfony on FrankenPHP) + Varnish, k6 (bench profile)
 ├── Dockerfile              PHP image for the app
 └── Makefile                Shortcuts for common commands
 ```

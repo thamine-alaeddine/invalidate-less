@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats strategy-full strategy-tags strategy publish-article
+.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats strategy-full strategy-tags strategy publish-article bench bench-all
 
 COMPOSE := docker compose
 
@@ -55,3 +55,10 @@ strategy: ## Show the active invalidation strategy
 
 publish-article: ## Publish a new article and invalidate the cache, e.g. make publish-article (optional category=3 author=7)
 	$(COMPOSE) exec app php bin/console app:article:publish $(if $(category),--category=$(category)) $(if $(author),--author=$(author))
+
+bench: ## Run one benchmark, e.g. make bench strategy=tags (env: READERS, DURATION, WARMUP_DURATION, EDIT_EVERY, PUBLISH_EVERY, SEED)
+	bench/run.sh $(or $(strategy),full)
+
+bench-all: ## Run the benchmark for every strategy, one after the other
+	bench/run.sh full
+	bench/run.sh tags

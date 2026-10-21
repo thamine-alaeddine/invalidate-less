@@ -3,3 +3,5 @@
 /.env.local
 /.env.*.local
 /.idea/
+/bench/results/
+/bench/urls.json

@@ -21,3 +21,13 @@ services:
       - ./docker/varnish/default.vcl:/etc/varnish/default.vcl:ro
     ports:
       - "8082:80"   # the site as readers see it, through Varnish
+
+  # Load generator, only started by the benchmark (make bench).
+  k6:
+    image: grafana/k6:1.0.0
+    profiles: ["bench"]
+    depends_on:
+      - varnish
+    volumes:
+      - ./bench:/bench
+    working_dir: /bench
