@@ -33,7 +33,7 @@ composer: ## Run a Composer command, e.g. make composer c="require foo/bar"
 	$(COMPOSE) exec app composer $(c)
 
 check-cache: ## Show cache headers from Varnish
-	@curl -sI http://localhost:8080/ | grep -iE "x-cache|cache-control|age"
+	@curl -sI http://localhost:8082/ | grep -iE "x-cache|cache-control|age"
 
 seed: ## Recreate the schema and seed deterministic content
 	$(COMPOSE) exec app php bin/console app:seed

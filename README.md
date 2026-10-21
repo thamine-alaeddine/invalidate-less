@@ -54,8 +54,11 @@ Requirements: Docker with Docker Compose, and `make`.
 # 1. Install PHP dependencies (first time only)
 make install
 
-# 2. Start the app and Varnish
-make up
+# 2. Start the app and Varnish in the background
+make start
+
+# 3. Create the database and seed the content (same data on every run)
+make seed
 ```
 
 Then open:
@@ -87,6 +90,7 @@ Run `make` to list them all.
 | `make console c="cache:clear"` | Run a Symfony console command |
 | `make composer c="require foo/bar"` | Run a Composer command |
 | `make check-cache` | Show cache headers from Varnish |
+| `make seed` | Recreate the schema and seed deterministic content |
 
 ## Project structure
 
@@ -94,7 +98,11 @@ Run `make` to list them all.
 ├── config/                 Symfony configuration
 ├── docker/varnish/         Varnish configuration (VCL)
 ├── public/index.php        Symfony front controller
-├── src/Controller/         Page controllers
+├── src/Command/            Console commands (`app:seed`)
+├── src/Controller/         Page controllers (home, category, author, article)
+├── src/Entity/             Doctrine entities (Article, Category, Author)
+├── src/EventSubscriber/    Cache headers for every page
+├── templates/              Twig templates
 ├── docker-compose.yml      app (Symfony on FrankenPHP) + Varnish
 ├── Dockerfile              PHP image for the app
 └── Makefile                Shortcuts for common commands
