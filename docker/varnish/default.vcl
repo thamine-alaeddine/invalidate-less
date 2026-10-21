@@ -52,7 +52,11 @@ sub vcl_backend_response {
 sub vcl_deliver {
     unset resp.http.X-Url;
     unset resp.http.X-Host;
-    unset resp.http.xkey;
+    # Expose tags for debugging under a readable name.
+    if (resp.http.xkey) {
+        set resp.http.X-Cache-Tags = resp.http.xkey;
+        unset resp.http.xkey;
+    }
 
     # Make cache behaviour visible in response headers
     if (obj.hits > 0) {
