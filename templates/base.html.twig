@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}invalidate-less{% endblock %} · invalidate-less</title>
+</head>
+<body>
+    <header>
+        <p><a href="{{ path('home') }}"><strong>invalidate-less</strong></a></p>
+        <nav>
+            {% for category in nav_categories() %}
+                <a href="{{ path('category', {slug: category.slug}) }}">{{ category.name }}</a>{{ not loop.last ? ' · ' }}
+            {% endfor %}
+        </nav>
+    </header>
+    <main>
+        {% block body %}{% endblock %}
+    </main>
+    <footer>
+        {# Unchanged timestamp on reload means the page came from the cache. #}
+        <p>Page generated at <strong>{{ 'now'|date('H:i:s.v') }}</strong>.</p>
+    </footer>
+</body>
+</html>
