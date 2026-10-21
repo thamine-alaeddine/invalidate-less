@@ -13,7 +13,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class AuthorController extends AbstractController
 {
     #[Route('/author/{slug}', name: 'author')]
-    #[Cache(public: true, maxage: 0, smaxage: 86400)]
+    #[Cache(public: true, maxage: 60, smaxage: 86400)]
     public function __invoke(#[MapEntity(mapping: ['slug' => 'slug'])] Author $author, ArticleRepository $articles): Response
     {
         return $this->render('author.html.twig', [
