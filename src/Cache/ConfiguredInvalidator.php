@@ -11,14 +11,14 @@ use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
 final class ConfiguredInvalidator implements ArticleInvalidator
 {
     public function __construct(
-        #[AutowireLocator(['full' => FullPurgeInvalidator::class, 'tags' => TagInvalidator::class])]
+        #[AutowireLocator(['full' => FullPurgeInvalidator::class, 'tags' => TagInvalidator::class, 'ttl' => NoopInvalidator::class])]
         private readonly ContainerInterface $strategies,
         #[Autowire(env: 'INVALIDATION_STRATEGY')]
         private readonly string $strategy,
     ) {
         // Fails before the editor touches the database.
         if (!$strategies->has($strategy)) {
-            throw new \InvalidArgumentException(\sprintf('Unknown INVALIDATION_STRATEGY "%s", expected "full" or "tags".', $strategy));
+            throw new \InvalidArgumentException(\sprintf('Unknown INVALIDATION_STRATEGY "%s", expected "full", "tags" or "ttl".', $strategy));
         }
     }
 

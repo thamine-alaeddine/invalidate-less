@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Runs one benchmark for a strategy: fresh data, empty cache, warm-up, measured k6 run, Varnish/CPU deltas.
-# Usage: bench/run.sh full|tags   (tuning via env: READERS, DURATION, WARMUP_DURATION, EDIT_EVERY, PUBLISH_EVERY, SEED)
+# Usage: bench/run.sh full|tags|ttl   (tuning via env: READERS, DURATION, WARMUP_DURATION, EDIT_EVERY, PUBLISH_EVERY, SEED, SHORT_TTL)
 set -euo pipefail
 
-STRATEGY="${1:?usage: bench/run.sh full|tags}"
+STRATEGY="${1:?usage: bench/run.sh full|tags|ttl}"
 READERS="${READERS:-50}"
 DURATION="${DURATION:-3m}"
 WARMUP_DURATION="${WARMUP_DURATION:-30s}"
@@ -12,6 +12,7 @@ PUBLISH_EVERY="${PUBLISH_EVERY:-6}"
 SEED="${SEED:-42}"
 # Exported so every compose call keeps the app on this strategy.
 export INVALIDATION_STRATEGY="$STRATEGY"
+export SHORT_TTL="${SHORT_TTL:-60}"
 
 cd "$(dirname "$0")/.."
 RESULTS=bench/results
@@ -24,7 +25,7 @@ stats() { compose exec -T varnish varnishstat -1 -j; }
 counter() { jq -r --arg c "$2" '(.counters // .)[$c].value' <<<"$1"; }
 k6() { compose --profile bench run --rm --no-deps -e READERS="$READERS" -e EDIT_EVERY="$EDIT_EVERY" -e PUBLISH_EVERY="$PUBLISH_EVERY" -e SEED="$SEED" "$@"; }
 
-echo "==> strategy=$STRATEGY readers=$READERS duration=$DURATION warmup=$WARMUP_DURATION edit_every=${EDIT_EVERY}s publish_every=$PUBLISH_EVERY"
+echo "==> strategy=$STRATEGY short_ttl=${SHORT_TTL}s readers=$READERS duration=$DURATION warmup=$WARMUP_DURATION edit_every=${EDIT_EVERY}s publish_every=$PUBLISH_EVERY"
 
 echo "==> Fresh containers (strategy $STRATEGY, empty Varnish cache)"
 compose up -d --force-recreate app varnish >/dev/null 2>&1

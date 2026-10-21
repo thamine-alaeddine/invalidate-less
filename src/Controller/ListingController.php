@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Cache\CacheTags;
+use App\Cache\CacheTtl;
 use App\Entity\Article;
 use App\Entity\Author;
 use App\Entity\Category;
@@ -15,12 +16,13 @@ use Symfony\Component\Routing\Attribute\Route;
 
 // Automatic listings rendered as ESI fragments: each one is cached and tagged on its own in Varnish.
 #[Route('/_esi')]
-#[Cache(public: true, maxage: 0, smaxage: 86400)]
+#[Cache(public: true, maxage: 0)]
 final class ListingController extends AbstractController
 {
     public function __construct(
         private readonly ArticleRepository $articles,
         private readonly ResponseTagger $tagger,
+        private readonly CacheTtl $ttl,
     ) {
     }
 
@@ -60,6 +62,6 @@ final class ListingController extends AbstractController
     {
         $this->tagger->addTags([$listTag, ...CacheTags::articles(...$articles)]);
 
-        return $this->render('_listing.html.twig', ['articles' => $articles]);
+        return $this->render('_listing.html.twig', ['articles' => $articles])->setSharedMaxAge($this->ttl->listing());
     }
 }

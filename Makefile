@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats strategy-full strategy-tags strategy publish-article bench bench-all
+.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats strategy-full strategy-tags strategy-ttl strategy publish-article bench bench-all
 
 COMPOSE := docker compose
 
@@ -50,6 +50,9 @@ strategy-full: ## Switch to strategy A: ban the whole Varnish cache on article u
 strategy-tags: ## Switch to strategy B: purge only pages tagged with the updated article
 	INVALIDATION_STRATEGY=tags $(COMPOSE) up -d app
 
+strategy-ttl: ## Switch to TTL-only: no purge, pages and listings expire after SHORT_TTL seconds (default 60)
+	INVALIDATION_STRATEGY=ttl $(COMPOSE) up -d app
+
 strategy: ## Show the active invalidation strategy
 	@$(COMPOSE) exec app printenv INVALIDATION_STRATEGY
 
@@ -62,3 +65,4 @@ bench: ## Run one benchmark, e.g. make bench strategy=tags (env: READERS, DURATI
 bench-all: ## Run the benchmark for every strategy, one after the other
 	bench/run.sh full
 	bench/run.sh tags
+	bench/run.sh ttl
