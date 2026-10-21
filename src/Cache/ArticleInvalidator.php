@@ -4,8 +4,10 @@ namespace App\Cache;
 
 use App\Entity\Article;
 
-// Invalidation strategy run after an article changes.
+// Invalidation strategy run after the editor changes content.
 interface ArticleInvalidator
 {
-    public function invalidateArticle(Article $article): void;
+    public function articleUpdated(Article $article): void;
+
+    public function articlePublished(Article $article): void;
 }

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats strategy-full strategy-tags strategy
+.PHONY: help install up start down restart logs shell console composer check-cache seed update-article varnish-stats strategy-full strategy-tags strategy publish-article
 
 COMPOSE := docker compose
 
@@ -52,3 +52,6 @@ strategy-tags: ## Switch to strategy B: purge only pages tagged with the updated
 
 strategy: ## Show the active invalidation strategy
 	@$(COMPOSE) exec app printenv INVALIDATION_STRATEGY
+
+publish-article: ## Publish a new article and invalidate the cache, e.g. make publish-article (optional category=3 author=7)
+	$(COMPOSE) exec app php bin/console app:article:publish $(if $(category),--category=$(category)) $(if $(author),--author=$(author))

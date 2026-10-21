@@ -22,8 +22,13 @@ final class ConfiguredInvalidator implements ArticleInvalidator
         }
     }
 
-    public function invalidateArticle(Article $article): void
+    public function articleUpdated(Article $article): void
     {
-        $this->strategies->get($this->strategy)->invalidateArticle($article);
+        $this->strategies->get($this->strategy)->articleUpdated($article);
+    }
+
+    public function articlePublished(Article $article): void
+    {
+        $this->strategies->get($this->strategy)->articlePublished($article);
     }
 }
