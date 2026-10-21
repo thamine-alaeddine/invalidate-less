@@ -4,6 +4,8 @@ services:
     environment:
       # Plain HTTP on port 80 inside the container (no automatic HTTPS)
       SERVER_NAME: ":80"
+      # "full" (strategy A) or "tags" (strategy B); e.g. INVALIDATION_STRATEGY=tags make start
+      INVALIDATION_STRATEGY: ${INVALIDATION_STRATEGY:-full}
     volumes:
       - ./:/app
     ports:

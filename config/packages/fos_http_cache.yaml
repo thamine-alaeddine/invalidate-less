@@ -1,11 +1,14 @@
 fos_http_cache:
     proxy_client:
         varnish:
+            # xkey: pages carry an "xkey" header, PURGEKEYS drops every page with a given key.
+            tag_mode: purgekeys
+            # Hard purge (not soft), so strategy B removes pages like strategy A's ban does.
+            tags_header: xkey-purge
             http:
                 servers: ['varnish:80']
                 base_url: 'varnish'
-    # Tags come with strategy B (week 4).
     tags:
-        enabled: false
+        enabled: true
     debug:
         enabled: false

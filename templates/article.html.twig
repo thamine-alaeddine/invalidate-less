@@ -14,6 +14,6 @@
     </article>
     <aside>
         <h2>More in {{ article.category.name }}</h2>
-        {{ include('_article_list.html.twig', {articles: related|filter(a => a.id != article.id)|slice(0, 5)}) }}
+        {{ include('_article_list.html.twig', {articles: related}) }}
     </aside>
 {% endblock %}

@@ -1,12 +1,14 @@
 vcl 4.1;
 
+import xkey;
+
 # Symfony app (the "origin")
 backend default {
     .host = "app";
     .port = "80";
 }
 
-# Who may send BAN requests: Docker networks only (local benchmark).
+# Who may send BAN and PURGEKEYS requests: Docker networks only (local benchmark).
 acl invalidators {
     "localhost";
     "10.0.0.0"/8;
@@ -28,9 +30,18 @@ sub vcl_recv {
 
         return (synth(200, "Banned"));
     }
-}
 
-# Week 4: tag-based purge with xkey (strategy B) goes here.
+    # Strategy B: FOSHttpCacheBundle sends PURGEKEYS with the article keys in xkey-purge.
+    if (req.method == "PURGEKEYS") {
+        if (!client.ip ~ invalidators) {
+            return (synth(405, "Not allowed"));
+        }
+
+        set req.http.n-gone = xkey.purge(req.http.xkey-purge);
+
+        return (synth(200, "Purged " + req.http.n-gone + " objects"));
+    }
+}
 
 sub vcl_backend_response {
     # Store URL and host on the object for lurker-friendly bans.
@@ -41,6 +52,7 @@ sub vcl_backend_response {
 sub vcl_deliver {
     unset resp.http.X-Url;
     unset resp.http.X-Host;
+    unset resp.http.xkey;
 
     # Make cache behaviour visible in response headers
     if (obj.hits > 0) {
