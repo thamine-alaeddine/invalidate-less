@@ -15,18 +15,19 @@ A fake news site, seeded with fixtures:
 - about 5,000 articles, 20 categories and 100 authors
 - page types: home, category, author and article pages
 - each page displays several pieces of content (the home page shows the latest articles, a category page lists its articles, and so on), so one article change affects several pages
+- every article listing is an automatic list (latest articles by query), rendered as an ESI fragment that Varnish caches and tags separately from the page around it
 
 During each benchmark run:
 
 - simulated readers browse the site continuously
-- an "editor" updates one article at a regular interval (for example, every 10 seconds)
+- an "editor" updates one article at a regular interval (for example, every 10 seconds), and publishes new articles that enter the automatic listings
 
 ## Strategies compared
 
 | Strategy | On article update |
 |---|---|
 | **A. Full purge** | Ban the entire Varnish cache |
-| **B. Tag-based purge** | Purge only the pages tagged with the changed article (Varnish xkey) |
+| **B. Tag-based purge** | Purge only what is tagged with the change (Varnish xkey): the article and listing fragments showing it on update, the listings it enters on publish |
 | **C. Tag-based + CDN** | Strategy B, plus translating tags into the URL list sent to a CloudFront invalidation |
 
 ## Metrics
@@ -108,6 +109,7 @@ Run `make` to list them all.
 | `make check-cache` | Show cache headers from Varnish |
 | `make seed` | Recreate the schema and seed deterministic content |
 | `make update-article id=42` | Update one article and invalidate the cache |
+| `make publish-article` | Publish a new article (optional `category=3 author=7`) and invalidate the listings it enters |
 | `make varnish-stats` | Show Varnish hit, miss, ban and object counters |
 | `make strategy-full` | Switch to strategy A (full purge) |
 | `make strategy-tags` | Switch to strategy B (tag-based purge) |
@@ -119,11 +121,12 @@ Run `make` to list them all.
 ├── config/                 Symfony configuration
 ├── docker/varnish/         Varnish configuration (VCL)
 ├── public/index.php        Symfony front controller
-├── src/Command/            Console commands (`app:seed`)
+├── src/Command/            Console commands (seed, update, publish)
+├── src/Content/            Deterministic fake text generator
 ├── src/Controller/         Page controllers (home, category, author, article)
 ├── src/Entity/             Doctrine entities (Article, Category, Author)
 ├── src/Cache/              Invalidation strategies
-├── src/Editor/             Article update service (endpoint + CLI)
+├── src/Editor/             Article update and publish service (endpoints + CLI)
 ├── templates/              Twig templates
 ├── docker-compose.yml      app (Symfony on FrankenPHP) + Varnish
 ├── Dockerfile              PHP image for the app
