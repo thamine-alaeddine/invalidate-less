@@ -26,9 +26,12 @@ During each benchmark run:
 
 | Strategy | On article update |
 |---|---|
+| **TTL only** (baseline) | Purge nothing; pages and listings expire after a short TTL (60 s) |
 | **A. Full purge** | Ban the entire Varnish cache |
 | **B. Tag-based purge** | Purge only what is tagged with the change (Varnish xkey): the article and listing fragments showing it on update, the listings it enters on publish |
 | **C. Tag-based + CDN** | Strategy B, plus translating tags into the URL list sent to a CloudFront invalidation |
+
+A and B keep long TTLs (1 hour for articles, 1 day elsewhere) because purges keep content fresh. TTL only trades freshness for simplicity: readers can see content up to 60 s old, plus Varnish's 10 s default grace. Staleness is not measured yet, so compare its numbers with that in mind.
 
 ## Metrics
 
@@ -79,9 +82,10 @@ Update an article and watch the cache get purged. Pick the strategy first:
 
 - `full` (default): strategy A, bans the whole Varnish cache
 - `tags`: strategy B, purges only the pages showing that article (Varnish xkey)
+- `ttl`: no purge; the change shows up once the 60 s TTL expires
 
 ```bash
-make strategy-tags   # or make strategy-full; make strategy shows the active one
+make strategy-tags   # or make strategy-full / make strategy-ttl; make strategy shows the active one
 
 make update-article id=1
 # or, as the k6 editor will do:
@@ -113,6 +117,7 @@ Run `make` to list them all.
 | `make varnish-stats` | Show Varnish hit, miss, ban and object counters |
 | `make strategy-full` | Switch to strategy A (full purge) |
 | `make strategy-tags` | Switch to strategy B (tag-based purge) |
+| `make strategy-ttl` | Switch to TTL only (no purge, short TTL) |
 | `make strategy` | Show the active invalidation strategy |
 | `make bench strategy=tags` | Run one benchmark for a strategy |
 | `make bench-all` | Run the benchmark for every strategy |
@@ -135,6 +140,7 @@ Each run is isolated and reproducible: it recreates the containers on the chosen
 | `EDIT_EVERY` | 10 | seconds between editor actions (on the origin) |
 | `PUBLISH_EVERY` | 6 | every Nth editor action publishes a new article; the others update one |
 | `SEED` | 42 | random seed for the readers' page sequence |
+| `SHORT_TTL` | 60 | shared TTL in seconds for the `ttl` strategy |
 
 Readers' page mix: 15% home, 20% category, 10% author, 55% article; 80% of article views (and of updates) target the 200 newest articles.
 
