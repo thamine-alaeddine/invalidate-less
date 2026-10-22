@@ -40,6 +40,7 @@ SECTION="$(
     chart "Reader p95 latency (lower is better)" "ms" "$(bars 10)"
     chart "Update visible after, p95 (lower is better)" "seconds" "$(bars 12 2)"
     chart "Publish visible after, p95 (lower is better)" "seconds" "$(bars 13 2)"
+    echo "The probes poll every 0.5 s, so \"visible after\" values under 1 s mostly mean \"seen by the first or second probe\". The TTL-only bars flatten the other two: both purge strategies stay under 1 s."
 )"
 
 if [ "${1:-}" = "--stdout" ]; then
@@ -48,8 +49,9 @@ if [ "${1:-}" = "--stdout" ]; then
 fi
 
 # Replaces everything between the results markers in the README.
-awk -v section="$SECTION" '
-    /<!-- results:start -->/ { print; print section; skip = 1; next }
+# Passed through the environment: BSD awk rejects newlines in -v values.
+SECTION="$SECTION" awk '
+    /<!-- results:start -->/ { print; print ENVIRON["SECTION"]; skip = 1; next }
     /<!-- results:end -->/ { skip = 0 }
     !skip { print }' "$README" >"$README.tmp"
 mv "$README.tmp" "$README"
