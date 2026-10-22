@@ -16,7 +16,7 @@ Strategies being compared, all triggered by an editor update or publish:
 Everything runs through Docker Compose, wrapped by the Makefile; there is no local PHP setup. `make` lists all targets.
 
 ```bash
-make install                    # composer install (first time only)
+make install                    # composer install (the app's entrypoint also runs it, and seeds, on first start)
 make up                         # start app, Varnish, editor, sqs, invalidator (foreground); `make start` for background
 make seed                       # drop + recreate schema, seed deterministic content (containers must run)
 make console c="cache:clear"    # Symfony console
@@ -43,7 +43,7 @@ No test suite, linter or static analysis is configured yet.
 
 ## Architecture
 
-- `app` service: FrankenPHP (PHP 8.3) serving `public/index.php`, repo bind-mounted at `/app` (code changes apply without rebuild). `SERVER_NAME=":80"` disables automatic HTTPS.
+- `app` service: FrankenPHP (PHP 8.3) serving `public/index.php`, repo bind-mounted at `/app` (code changes apply without rebuild). `docker/app/entrypoint.sh` runs `composer install` when `vendor/` is missing and `app:seed` when the `article` table is missing (checks the schema, not the file: the editor may create an empty DB file first), so a fresh clone works with `docker compose up`. `SERVER_NAME=":80"` disables automatic HTTPS.
 - `varnish` service: `docker/varnish/default.vcl`, backend `app:80`; handles purges and assembles ESI.
 - `editor` service: NestJS 11 on Node 24 (`editor/`), built into its image (`make editor-build` after changes). Owns every write and queues an event per change; the Symfony app is read-only.
 - `sqs` service: ElasticMQ (`docker/elasticmq/elasticmq.conf`), in-memory, queues `article-events` (visibility 30 s) and `article-events-dlq` (after 5 receives). Editor and invalidator share the `x-sqs-env` compose anchor (endpoint, queue URL, dummy credentials).

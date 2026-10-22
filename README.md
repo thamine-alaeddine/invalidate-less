@@ -71,18 +71,13 @@ The invalidator's core (`invalidator/src/core/`) maps an article event to a purg
 
 ## Getting started
 
-Requirements: Docker with Docker Compose, and `make`.
+Requirements: Docker with Docker Compose, `make`, and `curl` + `jq` for the benchmark runner (both ship with macOS).
 
 ```bash
-# 1. Install PHP dependencies (first time only)
-make install
-
-# 2. Start the app and Varnish in the background
-make start
-
-# 3. Create the database and seed the content (same data on every run)
-make seed
+docker compose up -d    # or: make start
 ```
+
+On its first start the app installs the PHP dependencies and seeds the content (same data on every run), so the site needs a minute before it answers. `make seed` resets the content later on.
 
 Then open:
 
@@ -122,7 +117,7 @@ Run `make` to list them all.
 
 | Command | Description |
 |---|---|
-| `make install` | Install PHP dependencies |
+| `make install` | Install PHP dependencies (also done on the app's first start) |
 | `make up` | Build and start app + Varnish in the foreground |
 | `make start` | Build and start app + Varnish in the background |
 | `make down` | Stop and remove containers |
