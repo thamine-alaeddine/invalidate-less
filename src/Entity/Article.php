@@ -37,12 +37,6 @@ class Article
         $this->updatedAt = $publishedAt;
     }
 
-    public function edit(\DateTimeImmutable $now): void
-    {
-        ++$this->revision;
-        $this->updatedAt = $now;
-    }
-
     public function getId(): ?int
     {
         return $this->id;

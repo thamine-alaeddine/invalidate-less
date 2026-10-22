@@ -7,5 +7,3 @@ services:
         resource: '../src/'
         exclude:
             - '../src/Kernel.php'
-
-    App\Cache\ArticleInvalidator: '@App\Cache\ConfiguredInvalidator'

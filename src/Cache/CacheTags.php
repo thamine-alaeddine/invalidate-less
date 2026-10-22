@@ -4,7 +4,7 @@ namespace App\Cache;
 
 use App\Entity\Article;
 
-// Cache tag names shared by the responses that tag themselves and the strategies that purge them.
+// Cache tag names; the editor (editor/src/cache/cache-tags.ts) purges the same names.
 final class CacheTags
 {
     /**
