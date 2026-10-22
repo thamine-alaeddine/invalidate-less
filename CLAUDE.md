@@ -64,7 +64,7 @@ No test suite, linter or static analysis is configured yet.
 
 ## Scope rule
 
-Scope is frozen (see README "Scope (frozen)"). Out of scope on purpose: auth/admin UI, visual design, IaC, CI/CD, Kubernetes, monitoring dashboards, a third framework (NestJS is used only for the editor service). New ideas go in the README "Later" list, not into code, until the definition of done is met.
+Scope is frozen (see README "Scope (frozen)"); past deliberate changes are listed in its "Scope changes" table, so record any new one there with its reason. Out of scope on purpose: auth/admin UI, visual design, IaC, CI/CD, Kubernetes, monitoring dashboards, cloud deployment (the Lambda adapter is not deployed), a third framework or language. New ideas go in the README "Later" list, not into code, until the definition of done is met.
 
 ## Conventions
 

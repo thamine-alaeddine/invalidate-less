@@ -289,13 +289,25 @@ Results print at the end and are appended to `bench/results/results.md` (raw k6 
 
 **Out of scope, on purpose:**
 
-- authentication and admin UI (content updates happen through a CLI command or a simple endpoint)
+- authentication and admin UI (content updates go through the editor service's HTTP endpoints)
 - visual design beyond readable HTML
 - Infrastructure as Code, CI/CD, Kubernetes
-- monitoring dashboards (k6 output and `varnishstat` are enough)
-- a Lambda migration; this could be a separate future project
+- monitoring dashboards (k6 output, `varnishstat` and `make queue-stats` are enough)
+- deploying to a cloud provider: the Lambda adapter is built and tested locally, not deployed
+- a third framework or language
 
 **Scope rule:** any new idea goes into the "Later" list below. It does not get built before the definition of done is met.
+
+### Scope changes
+
+The scope was frozen in week 1, then deliberately changed. Each change is recorded here with its reason:
+
+| Change | Why |
+|---|---|
+| Added the **TTL only** baseline | Shows what invalidation buys compared with the common "just use a short TTL" setup |
+| Dropped **strategy C** (CloudFront tag-to-URL invalidation) | Too expensive to benchmark: $0.005 per invalidation path after 1,000 free per month, and one edit can fan out to about 260 article pages (see "Later") |
+| Moved writes to a **NestJS editor service** | Splits writes from reads, like a CMS backoffice beside its public site; the Symfony app is read-only |
+| Moved invalidation to a **queue-driven invalidator** (SQS API, worker and Lambda adapters) | Decouples invalidation from the editor, the way it is often done in production; it also makes the measured "visible after" include a realistic async delay |
 
 ## Milestones
 
@@ -320,4 +332,5 @@ _Coming soon._
 
 _Ideas parked until the definition of done is met:_
 
+- Deploy the invalidator on AWS (real SQS + Lambda, Varnish in a VPC) and compare its delay with the local worker.
 - Strategy C: CloudFront in front of Varnish with tag-to-URL invalidation. Dropped because invalidations cost $0.005 per path after 1,000 free per month, and an edit can fan out to about 260 article pages through the "More in category" fragment.
