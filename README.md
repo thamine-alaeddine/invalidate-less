@@ -1,6 +1,6 @@
 # invalidate-less
 
-A reproducible benchmark comparing **full cache purges** with **tag-based cache invalidation** on a content-heavy website, using Symfony, Varnish and CloudFront.
+A reproducible benchmark comparing **full cache purges** with **tag-based cache invalidation** on a content-heavy website, using Symfony and Varnish.
 
 > Status: 🚧 in progress. Results will be published here once the benchmarks are done.
 
@@ -29,7 +29,6 @@ During each benchmark run:
 | **TTL only** (baseline) | Purge nothing; pages and listings expire after a short TTL (60 s) |
 | **A. Full purge** | Ban the entire Varnish cache |
 | **B. Tag-based purge** | Purge only what is tagged with the change (Varnish xkey): the article and listing fragments showing it on update, the listings it enters on publish |
-| **C. Tag-based + CDN** | Strategy B, plus translating tags into the URL list sent to a CloudFront invalidation |
 
 A and B keep long TTLs (1 hour for articles, 1 day elsewhere) because purges keep content fresh. TTL only trades freshness for simplicity: readers can see content up to 60 s old, plus Varnish's 10 s default grace. The benchmark measures this staleness (see "visible after" below).
 
@@ -39,7 +38,6 @@ A and B keep long TTLs (1 hour for articles, 1 day elsewhere) because purges kee
 - cache hit ratio (from `varnishstat`)
 - response time, p50 and p95 (from k6)
 - origin CPU usage
-- for strategy C: number of CloudFront invalidation paths per update
 
 ## Stack
 
@@ -48,7 +46,6 @@ A and B keep long TTLs (1 hour for articles, 1 day elsewhere) because purges kee
 - SQLite (kept simple on purpose)
 - Docker Compose for local runs
 - k6 for load testing
-- CloudFront for strategy C only
 
 ## Getting started
 
@@ -195,8 +192,7 @@ Results print at the end and are appended to `bench/results/results.md` (raw k6 
 | 3 | Varnish in front of the app with proper cache headers; strategy A works |
 | 4 | Strategy B: pages tagged, xkey purges on article update |
 | 5 | k6 scenario written; first local benchmark runs |
-| 6 | Strategy C: CloudFront in front, tag-to-URL invalidation |
-| 7–8 | Final benchmark runs, results table and charts in this README |
+| 6 | Final benchmark runs, results table and charts in this README |
 
 ## Definition of done
 
@@ -210,8 +206,4 @@ _Coming soon._
 
 _Ideas parked until the definition of done is met:_
 
--
-
-## Cost note
-
-Strategy C uses real AWS resources. Tear them down after each benchmark session.
+- Strategy C: CloudFront in front of Varnish with tag-to-URL invalidation. Dropped because invalidations cost $0.005 per path after 1,000 free per month, and an edit can fan out to about 260 article pages through the "More in category" fragment.

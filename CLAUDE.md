@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Reproducible benchmark: **full cache purge** vs **tag-based invalidation** on a fake news site (Symfony 7.4 + Varnish 7 + CloudFront). See README.md for the scenario, metrics and milestones. Weeks 1–5 are done (content model, seed data, all page types with ESI listings, editor update/publish, strategies A and B, k6 benchmark); CloudFront (strategy C) and final runs are not built yet. CloudFront (week 6) cannot process ESI, so Varnish must keep assembling pages behind it.
+Reproducible benchmark: **full cache purge** vs **tag-based invalidation** on a fake news site (Symfony 7.4 + Varnish 7). See README.md for the scenario, metrics and milestones. Weeks 1–5 are done (content model, seed data, all page types with ESI listings, editor update/publish, strategies A and B, k6 benchmark). Final runs and the README results are not done yet. Strategy C (CloudFront) was dropped for cost; see README "Later".
 
-Three strategies being compared, all triggered by an article update:
+Strategies being compared, all triggered by an editor update or publish:
+- **TTL only**: purge nothing, short TTLs.
 - **A. Full purge**: ban the whole Varnish cache.
 - **B. Tag-based**: purge only pages tagged with the changed article (Varnish xkey, via FOSHttpCacheBundle).
-- **C. Tag-based + CDN**: B, plus translating tags into a URL list for a CloudFront invalidation.
 
 ## Commands
 
@@ -55,8 +55,6 @@ No test suite, linter or static analysis is configured yet.
 ## Scope rule
 
 Scope is frozen (see README "Scope (frozen)"). Out of scope on purpose: auth/admin UI, visual design, IaC, CI/CD, Kubernetes, monitoring dashboards, a second framework. New ideas go in the README "Later" list, not into code, until the definition of done is met.
-
-Strategy C uses real AWS resources; they must be torn down after each benchmark session.
 
 ## Conventions
 
