@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up start down restart logs shell console composer check-cache seed update-article editor-build editor-logs invalidator-build invalidator-logs queue-stats varnish-stats strategy-full strategy-tags strategy-ttl strategy publish-article bench bench-all
+.PHONY: help install up start down restart logs shell console composer check-cache seed update-article editor-build editor-logs invalidator-build invalidator-logs queue-stats varnish-stats strategy-full strategy-tags strategy-ttl strategy publish-article bench bench-all report
 
 COMPOSE := docker compose
 
@@ -87,3 +87,6 @@ bench-all: ## Run the benchmark for every strategy, one after the other
 	bench/run.sh full
 	bench/run.sh tags
 	bench/run.sh ttl
+
+report: ## Rebuild the README results section (median per strategy, table and Mermaid charts) from bench/results/results.md
+	bench/report.sh

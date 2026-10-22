@@ -230,6 +230,7 @@ Run `make` to list them all.
 | `make strategy` | Show the active invalidation strategy |
 | `make bench strategy=tags` | Run one benchmark for a strategy |
 | `make bench-all` | Run the benchmark for every strategy |
+| `make report` | Rebuild the README results section (medians, table, charts) from `bench/results/results.md` |
 
 ### Running a benchmark
 
@@ -326,7 +327,9 @@ Anyone can clone this repository, run `docker compose up`, run a single benchmar
 
 ## Results
 
-_Coming soon._
+<!-- results:start -->
+_Final runs in progress._
+<!-- results:end -->
 
 ## Later
 
