@@ -9,6 +9,8 @@ services:
       SHORT_TTL: ${SHORT_TTL:-60}
     volumes:
       - ./:/app
+      # SQLite on a named volume, shared with the editor (bind mounts are unsafe for SQLite locks across containers).
+      - data:/app/var/data
     ports:
       - "8002:80"   # direct access to Symfony, bypassing the cache
 
@@ -32,3 +34,6 @@ services:
     volumes:
       - ./bench:/bench
     working_dir: /bench
+
+volumes:
+  data:
