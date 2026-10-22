@@ -21,8 +21,11 @@ MEDIANS="$(
 m() { awk -v s="$1" -v c="$2" -v p="${3:-1}" '$1 == s && $2 == c { printf "%.*f", p, $3 }' <<<"$MEDIANS"; }
 runs() { awk -v s="$1" '$1 == s && $2 == 4 { print $4 }' <<<"$MEDIANS"; }
 bars() { echo "[$(m full "$1" "${2:-1}"), $(m tags "$1" "${2:-1}"), $(m ttl "$1" "${2:-1}")]"; }
+# The y axis starts at 0 so bar heights stay proportional (Mermaid starts it at the smallest value otherwise).
 chart() {
-    printf '```mermaid\nxychart-beta\n    title "%s"\n    x-axis ["A. Full purge", "B. Tag-based", "TTL only"]\n    y-axis "%s"\n    bar %s\n```\n\n' "$1" "$2" "$3"
+    local top
+    top=$(tr -d '[],' <<<"$3" | awk '{ m = $1; for (i = 2; i <= NF; i++) if ($i > m) m = $i; printf "%g", m * 1.1 }')
+    printf '```mermaid\nxychart-beta\n    title "%s"\n    x-axis ["Purge everything", "Purge only what changed", "Wait for expiry"]\n    y-axis "%s" 0 --> %s\n    bar %s\n```\n\n' "$1" "$2" "$top" "$3"
 }
 
 SECTION="$(
@@ -35,12 +38,14 @@ SECTION="$(
         echo "| $label | $(m $s 5) | $(m $s 6 0) | $(m $s 7) | $(m $s 8)% | $(m $s 9) | $(m $s 10) | $(m $s 11)% | $(m $s 12 2) | $(m $s 13 2) | $(m $s 14 0) |"
     done
     echo
-    chart "Origin requests per second (lower is better)" "req/s" "$(bars 7)"
-    chart "Origin CPU, 100% = one core (lower is better)" "%" "$(bars 11)"
-    chart "Reader p95 latency (lower is better)" "ms" "$(bars 10)"
-    chart "Update visible after, p95 (lower is better)" "seconds" "$(bars 12 2)"
-    chart "Publish visible after, p95 (lower is better)" "seconds" "$(bars 13 2)"
-    echo "The probes poll every 0.5 s, so \"visible after\" values under 1 s mostly mean \"seen by the first or second probe\". The TTL-only bars flatten the other two: both purge strategies stay under 1 s."
+    echo "In the charts, **purge everything** is strategy A, **purge only what changed** is strategy B (tags) and **wait for expiry** is TTL only (pages refresh on their own after 60 s). Times are the value 95% of cases stay under, and every number is the median of $(runs tags) runs."
+    echo
+    chart "Requests reaching the server, per second (lower is better)" "requests per second" "$(bars 7)"
+    chart "How busy the server is, 100% = one processor core (lower is better)" "% busy" "$(bars 11)"
+    chart "Slow page loads: 95% of pages load faster than this (lower is better)" "milliseconds" "$(bars 10)"
+    chart "Time before readers see an edited article (lower is better)" "seconds" "$(bars 12 2)"
+    chart "Time before a new article shows on the home page (lower is better)" "seconds" "$(bars 13 2)"
+    echo "In the last two charts, both purge strategies show changes in under a second; their bars only look empty next to the 30 to 55 seconds of waiting for expiry. Times are checked every half second, so anything under a second counts as immediate."
 )"
 
 if [ "${1:-}" = "--stdout" ]; then
