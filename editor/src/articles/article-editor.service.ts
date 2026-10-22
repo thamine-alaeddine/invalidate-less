@@ -1,15 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ARTICLE_INVALIDATOR, ArticleInvalidator } from '../cache/article-invalidator';
 import { TextGenerator } from '../content/text-generator';
+import { ARTICLE_EVENTS, ArticleEvents } from '../events/article-events';
 import { Article } from './article';
 import { ArticleRepository } from './article.repository';
 
-// Invalidation runs synchronously in every action so callers only return once caches are purged.
+// Every action queues an article event; the invalidator purges caches asynchronously.
 @Injectable()
 export class ArticleEditor {
   constructor(
     private readonly articles: ArticleRepository,
-    @Inject(ARTICLE_INVALIDATOR) private readonly invalidator: ArticleInvalidator,
+    @Inject(ARTICLE_EVENTS) private readonly events: ArticleEvents,
   ) {}
 
   async update(id: number): Promise<Article | undefined> {
@@ -19,7 +19,7 @@ export class ArticleEditor {
 
     this.articles.edit(id, now());
     const article = this.articles.find(id)!;
-    await this.invalidator.articleUpdated(article);
+    await this.events.updated(article);
 
     return article;
   }
@@ -44,7 +44,7 @@ export class ArticleEditor {
       authorId: author,
     });
     const article = this.articles.find(id)!;
-    await this.invalidator.articlePublished(article);
+    await this.events.published(article);
 
     return article;
   }

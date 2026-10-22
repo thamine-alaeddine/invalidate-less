@@ -2,12 +2,9 @@ import { Module } from '@nestjs/common';
 import { ArticleEditor } from './articles/article-editor.service';
 import { ArticleRepository } from './articles/article.repository';
 import { ArticlesController } from './articles/articles.controller';
-import { invalidatorProvider } from './cache/invalidator.provider';
-import { FullPurgeInvalidator } from './cache/full-purge.invalidator';
-import { NoopInvalidator } from './cache/noop.invalidator';
-import { TagInvalidator } from './cache/tag.invalidator';
-import { VarnishClient } from './cache/varnish.client';
 import { Database } from './database/database';
+import { ARTICLE_EVENTS } from './events/article-events';
+import { SqsArticleEvents } from './events/sqs-article-events';
 
 @Module({
   controllers: [ArticlesController],
@@ -15,11 +12,7 @@ import { Database } from './database/database';
     Database,
     ArticleRepository,
     ArticleEditor,
-    VarnishClient,
-    FullPurgeInvalidator,
-    TagInvalidator,
-    NoopInvalidator,
-    invalidatorProvider,
+    { provide: ARTICLE_EVENTS, useClass: SqsArticleEvents },
   ],
 })
 export class AppModule {}

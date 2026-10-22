@@ -1,3 +1,11 @@
+# SQS client settings shared by the editor and the invalidator (dummy credentials for ElasticMQ).
+x-sqs-env: &sqs-env
+  SQS_ENDPOINT: http://sqs:9324
+  QUEUE_URL: http://sqs:9324/000000000000/article-events
+  AWS_REGION: eu-west-3
+  AWS_ACCESS_KEY_ID: local
+  AWS_SECRET_ACCESS_KEY: local
+
 services:
   app:
     build: .
@@ -25,20 +33,39 @@ services:
     ports:
       - "8082:80"   # the site as readers see it, through Varnish
 
-  # NestJS editor: updates and publishes articles in the shared database, then invalidates Varnish.
+  # NestJS editor: updates and publishes articles in the shared database, then queues an article event.
   editor:
     build: ./editor
     depends_on:
-      - varnish
+      - sqs
     environment:
       PORT: 3000
       DATABASE_PATH: /data/data.db
-      VARNISH_URL: http://varnish
-      INVALIDATION_STRATEGY: ${INVALIDATION_STRATEGY:-full}
+      <<: *sqs-env
     volumes:
       - data:/data
     ports:
       - "3002:3000"
+
+  # SQS-compatible queue (ElasticMQ); real SQS only needs another SQS_ENDPOINT/QUEUE_URL and credentials.
+  sqs:
+    image: softwaremill/elasticmq-native:1.6.14
+    volumes:
+      - ./docker/elasticmq/elasticmq.conf:/opt/elasticmq.conf:ro
+    ports:
+      - "9334:9324"   # SQS API
+      - "9335:9325"   # ElasticMQ UI
+
+  # Consumes article events and invalidates Varnish with the active strategy (worker adapter; the Lambda adapter runs the same core).
+  invalidator:
+    build: ./invalidator
+    depends_on:
+      - sqs
+      - varnish
+    environment:
+      VARNISH_URL: http://varnish
+      INVALIDATION_STRATEGY: ${INVALIDATION_STRATEGY:-full}
+      <<: *sqs-env
 
   # Load generator, only started by the benchmark (make bench).
   k6:
