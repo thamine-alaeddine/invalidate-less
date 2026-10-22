@@ -25,6 +25,21 @@ services:
     ports:
       - "8082:80"   # the site as readers see it, through Varnish
 
+  # NestJS editor: updates and publishes articles in the shared database, then invalidates Varnish.
+  editor:
+    build: ./editor
+    depends_on:
+      - varnish
+    environment:
+      PORT: 3000
+      DATABASE_PATH: /data/data.db
+      VARNISH_URL: http://varnish
+      INVALIDATION_STRATEGY: ${INVALIDATION_STRATEGY:-full}
+    volumes:
+      - data:/data
+    ports:
+      - "3002:3000"
+
   # Load generator, only started by the benchmark (make bench).
   k6:
     image: grafana/k6:1.0.0
