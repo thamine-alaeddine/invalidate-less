@@ -1,6 +1,6 @@
 # invalidate-less
 
-A reproducible benchmark comparing **full cache purges** with **tag-based cache invalidation** on a content-heavy website, using Symfony and Varnish.
+A reproducible benchmark comparing **full cache purges** with **tag-based cache invalidation** on a content-heavy website, using Symfony, Varnish and a NestJS editor service.
 
 > Status: 🚧 in progress. Results will be published here once the benchmarks are done.
 
@@ -41,9 +41,10 @@ A and B keep long TTLs (1 hour for articles, 1 day elsewhere) because purges kee
 
 ## Stack
 
-- PHP 8.3, Symfony 7, FOSHttpCacheBundle
+- PHP 8.3, Symfony 7, FOSHttpCacheBundle: the public site, read-only, tags its responses
+- Node 24, NestJS 11: the editor service, writes articles and invalidates Varnish (like a CMS backoffice beside its front)
 - Varnish 7 with the xkey module
-- SQLite (kept simple on purpose)
+- SQLite (kept simple on purpose), shared by the site and the editor through a Docker volume
 - Docker Compose for local runs
 - k6 for load testing
 
@@ -65,6 +66,7 @@ make seed
 Then open:
 
 - http://localhost:8002: Symfony directly (the origin, never cached)
+- http://localhost:3002: the editor service (NestJS), which updates and publishes articles
 - http://localhost:8082: the same site through Varnish
 
 Check that caching works:
@@ -85,8 +87,8 @@ Update an article and watch the cache get purged. Pick the strategy first:
 make strategy-tags   # or make strategy-full / make strategy-ttl; make strategy shows the active one
 
 make update-article id=1
-# or, as the k6 editor will do:
-curl -X POST http://localhost:8002/editor/articles/1
+# or, as the k6 editor does:
+curl -X POST http://localhost:3002/articles/1
 
 make check-cache    # MISS again, then HIT (article 1 is on the home page)
 make varnish-stats  # hits, misses, bans
@@ -109,7 +111,9 @@ Run `make` to list them all.
 | `make composer c="require foo/bar"` | Run a Composer command |
 | `make check-cache` | Show cache headers from Varnish |
 | `make seed` | Recreate the schema and seed deterministic content |
-| `make update-article id=42` | Update one article and invalidate the cache |
+| `make update-article id=42` | Update one article through the editor and invalidate the cache |
+| `make editor-build` | Rebuild and restart the editor after a code change |
+| `make editor-logs` | Follow the editor's logs |
 | `make publish-article` | Publish a new article (optional `category=3 author=7`) and invalidate the listings it enters |
 | `make varnish-stats` | Show Varnish hit, miss, ban and object counters |
 | `make strategy-full` | Switch to strategy A (full purge) |
@@ -134,7 +138,7 @@ Each run is isolated and reproducible: it recreates the containers on the chosen
 | `RATE` | 1000 | reader requests per second through Varnish |
 | `DURATION` | 3m | measured run length |
 | `WARMUP_DURATION` | 30s | readers-only warm-up before measuring |
-| `EDIT_EVERY` | 10 | seconds between editor actions (on the origin) |
+| `EDIT_EVERY` | 10 | seconds between editor actions (sent to the editor service) |
 | `PUBLISH_EVERY` | 6 | every Nth editor action publishes a new article; the others update one |
 | `PROBE_TIMEOUT` | 120 | seconds a freshness probe waits for a change to show up before giving up |
 | `SEED` | 42 | random seed for the readers' page sequence |
@@ -157,14 +161,14 @@ Results print at the end and are appended to `bench/results/results.md` (raw k6 
 ├── config/                 Symfony configuration
 ├── docker/varnish/         Varnish configuration (VCL)
 ├── public/index.php        Symfony front controller
-├── src/Command/            Console commands (seed, update, publish)
+├── editor/                 NestJS editor service: article update/publish and cache invalidation
+├── src/Command/            Console commands (seed, benchmark URLs)
 ├── src/Content/            Deterministic fake text generator
 ├── src/Controller/         Page controllers (home, category, author, article)
 ├── src/Entity/             Doctrine entities (Article, Category, Author)
-├── src/Cache/              Invalidation strategies
-├── src/Editor/             Article update and publish service (endpoints + CLI)
+├── src/Cache/              Cache tags and TTLs
 ├── templates/              Twig templates
-├── docker-compose.yml      app (Symfony on FrankenPHP) + Varnish, k6 (bench profile)
+├── docker-compose.yml      app (Symfony on FrankenPHP), editor (NestJS), Varnish, k6 (bench profile)
 ├── Dockerfile              PHP image for the app
 └── Makefile                Shortcuts for common commands
 ```
@@ -179,7 +183,7 @@ Results print at the end and are appended to `bench/results/results.md` (raw k6 
 - visual design beyond readable HTML
 - Infrastructure as Code, CI/CD, Kubernetes
 - monitoring dashboards (k6 output and `varnishstat` are enough)
-- a second framework (NestJS) or a Lambda migration; these could be separate future projects
+- a Lambda migration; this could be a separate future project
 
 **Scope rule:** any new idea goes into the "Later" list below. It does not get built before the definition of done is met.
 
