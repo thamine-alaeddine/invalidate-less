@@ -6,3 +6,7 @@ RUN install-php-extensions zip intl opcache pdo_sqlite
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
+
+COPY docker/app/entrypoint.sh /usr/local/bin/app-entrypoint
+ENTRYPOINT ["app-entrypoint"]
+CMD ["--config", "/etc/frankenphp/Caddyfile", "--adapter", "caddyfile"]
