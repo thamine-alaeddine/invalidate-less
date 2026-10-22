@@ -328,7 +328,7 @@ Anyone can clone this repository, run `docker compose up`, run a single benchmar
 ## Results
 
 <!-- results:start -->
-Median of 3 runs per strategy (1000 req/s target, 10 CPUs given to Docker, k6, Varnish and the app on the same machine). Compare strategies with each other rather than reading absolute numbers; `make report` rebuilds this section from `bench/results/results.md`.
+Median of 3 runs per strategy (1000 req/s target, 10 CPUs given to Docker, k6, Varnish and the app on the same machine). Compare strategies with each other rather than reading absolute numbers; `make report` rebuilds this section and the charts from `bench/results/results.md`.
 
 | Strategy | Reader req/s | Dropped | Origin req/s | Hit ratio | p50 (ms) | p95 (ms) | Origin CPU | Update visible p95 (s) | Publish visible p95 (s) | Probe timeouts |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -336,49 +336,19 @@ Median of 3 runs per strategy (1000 req/s target, 10 CPUs given to Docker, k6, V
 | B. Tag-based | 1000.0 | 0 | 29.0 | 98.5% | 0.1 | 0.3 | 12.6% | 0.52 | 0.50 | 0 |
 | TTL only | 999.6 | 81 | 100.9 | 96.4% | 0.1 | 0.3 | 39.2% | 53.65 | 30.07 | 0 |
 
-In the charts, **purge everything** is strategy A, **purge only what changed** is strategy B (tags) and **wait for expiry** is TTL only (pages refresh on their own after 60 s). Times are the value 95% of cases stay under, and every number is the median of 3 runs.
+In the charts, **purge everything** is strategy A, **purge only what changed** is strategy B (tags) and **wait for expiry** is TTL only (pages refresh on their own after 60 s). Every number is the median of 3 runs.
 
-```mermaid
-xychart-beta
-    title "Requests reaching the server, per second (lower is better)"
-    x-axis ["Purge everything", "Purge only what changed", "Wait for expiry"]
-    y-axis "requests per second" 0 --> 284.79
-    bar [258.9, 29.0, 100.9]
-```
+![Requests reaching the server, per second](docs/charts/origin.svg)
 
-```mermaid
-xychart-beta
-    title "How busy the server is, 100% = one processor core (lower is better)"
-    x-axis ["Purge everything", "Purge only what changed", "Wait for expiry"]
-    y-axis "% busy" 0 --> 146.41
-    bar [133.1, 12.6, 39.2]
-```
+![How busy the server is](docs/charts/cpu.svg)
 
-```mermaid
-xychart-beta
-    title "Slow page loads: 95% of pages load faster than this (lower is better)"
-    x-axis ["Purge everything", "Purge only what changed", "Wait for expiry"]
-    y-axis "milliseconds" 0 --> 129.36
-    bar [117.6, 0.3, 0.3]
-```
+![Slow page loads](docs/charts/latency.svg)
 
-```mermaid
-xychart-beta
-    title "Time before readers see an edited article (lower is better)"
-    x-axis ["Purge everything", "Purge only what changed", "Wait for expiry"]
-    y-axis "seconds" 0 --> 59.015
-    bar [0.77, 0.52, 53.65]
-```
+![Time before readers see an edited article](docs/charts/update-visible.svg)
 
-```mermaid
-xychart-beta
-    title "Time before a new article shows on the home page (lower is better)"
-    x-axis ["Purge everything", "Purge only what changed", "Wait for expiry"]
-    y-axis "seconds" 0 --> 33.077
-    bar [0.50, 0.50, 30.07]
-```
+![Time before a new article shows on the home page](docs/charts/publish-visible.svg)
 
-In the last two charts, both purge strategies show changes in under a second; their bars only look empty next to the 30 to 55 seconds of waiting for expiry. Times are checked every half second, so anything under a second counts as immediate.
+Both purge strategies show changes in under a second; next to the 30 to 55 seconds of waiting for expiry their bars are barely visible. Times are checked every half second, so anything under a second counts as immediate.
 <!-- results:end -->
 
 ### What it shows

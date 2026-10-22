@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="206" viewBox="0 0 720 206" role="img" aria-label="Slow page loads">
+  <style>
+    svg{--surface:#fcfcfb;--ink:#0b0b0b;--ink-2:#52514e;--axis:#c3c2b7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+    .s-full{fill:#eb6834}.s-tags{fill:#2a78d6}.s-ttl{fill:#1baf7a}
+    @media (prefers-color-scheme: dark){svg{--surface:#1a1a19;--ink:#f0efec;--ink-2:#c3c2b7;--axis:#383835}.s-full{fill:#d95926}.s-tags{fill:#3987e5}.s-ttl{fill:#199e70}}
+    .bg{fill:var(--surface)} .title{fill:var(--ink);font-size:17px;font-weight:600} .note{fill:var(--ink-2);font-size:13px}
+    .label{fill:var(--ink);font-size:14px} .value{fill:var(--ink);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+    .axis{stroke:var(--axis);stroke-width:1}
+  </style>
+  <rect class="bg" width="720" height="206" rx="12" />
+  <text class="title" x="24" y="38">Slow page loads</text>
+  <text class="note" x="24" y="60">95% of pages load faster than this · lower is better</text>
+  <line class="axis" x1="224" y1="78" x2="224" y2="188" />
+  <text class="label" x="24" y="95" dominant-baseline="central">Purge everything</text>
+  <g class="s-full"><path d="M224,84h378a4,4 0 0 1 4,4v14a4,4 0 0 1 -4,4h-378z" /></g>
+  <text class="value" x="614" y="95" dominant-baseline="central">118 ms</text>
+  <text class="label" x="24" y="133" dominant-baseline="central">Purge only what changed</text>
+  <g class="s-tags"><rect x="224" y="122" width="2" height="22" /></g>
+  <text class="value" x="234" y="133" dominant-baseline="central">0.3 ms</text>
+  <text class="label" x="24" y="171" dominant-baseline="central">Wait for expiry</text>
+  <g class="s-ttl"><rect x="224" y="160" width="2" height="22" /></g>
+  <text class="value" x="234" y="171" dominant-baseline="central">0.3 ms</text>
+</svg>
