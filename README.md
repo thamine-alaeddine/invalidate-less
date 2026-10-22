@@ -67,7 +67,7 @@ The invalidator's core (`invalidator/src/core/`) maps an article event to a purg
 
 - **Any container platform** (ECS, Kubernetes, Fly, a VM): run the `invalidator/` image (the SQS worker). Set `QUEUE_URL`, `AWS_REGION` and credentials, and leave `SQS_ENDPOINT` unset to use real SQS.
 - **AWS Lambda**: `npm run bundle:lambda` builds `dist/lambda/index.js` (handler `index.handler`, Node 24). Add an SQS event source mapping with `ReportBatchItemFailures`, so only failed messages are retried. Varnish must be reachable from the Lambda (same VPC) and must allow the Lambda's addresses in its `invalidators` ACL.
-- **Another broker** (RabbitMQ, Pub/Sub…): events are plain CloudEvents JSON, so add an adapter that calls `handleEvent` on the editor side and on the invalidator side.
+- **Another broker** (RabbitMQ, Pub/Sub…): events are plain CloudEvents JSON, so add an `ArticleEvents` adapter in the editor (`editor/src/events/`) and an entry adapter that calls `handleEvent` in the invalidator.
 
 ## Getting started
 
