@@ -1,9 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Cache } from '../core/handle-event';
 
 // Sends BAN and PURGEKEYS requests the way FOSHttpCacheBundle did; resolves once Varnish has applied them.
-@Injectable()
-export class VarnishClient {
-  private readonly url = process.env.VARNISH_URL ?? 'http://varnish';
+export class VarnishClient implements Cache {
+  constructor(private readonly url = process.env.VARNISH_URL ?? 'http://varnish') {}
 
   // Matches the VCL's lurker-friendly ban on X-Host, X-Url and Content-Type.
   async banAll(): Promise<void> {
@@ -15,7 +14,7 @@ export class VarnishClient {
   }
 
   private async send(method: string, headers: Record<string, string>): Promise<void> {
-    const response = await fetch(`${this.url}/`, { method, headers });
+    const response = await fetch(`${this.url}/`, { method, headers, signal: AbortSignal.timeout(5000) });
     if (!response.ok) {
       throw new Error(`Varnish ${method} failed: ${response.status} ${await response.text()}`);
     }

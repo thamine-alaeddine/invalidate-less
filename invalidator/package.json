@@ -1,0 +1,23 @@
+{
+  "name": "invalidate-less-invalidator",
+  "private": true,
+  "description": "Consumes article events from a queue and invalidates Varnish; runs as a worker or an AWS Lambda.",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/src/adapters/sqs-worker.js",
+    "bundle:lambda": "esbuild src/adapters/lambda.ts --bundle --platform=node --target=node24 --outfile=dist/lambda/index.js",
+    "invoke:lambda": "node dist/scripts/invoke-lambda.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1155.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^24.19.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
+  }
+}
