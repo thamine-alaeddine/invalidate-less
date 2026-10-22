@@ -12,7 +12,7 @@ EDIT_EVERY="${EDIT_EVERY:-10}"
 PUBLISH_EVERY="${PUBLISH_EVERY:-6}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-120}"
 SEED="${SEED:-42}"
-# Exported so every compose call keeps the app on this strategy.
+# Exported so every compose call keeps the app and editor on this strategy.
 export INVALIDATION_STRATEGY="$STRATEGY"
 export SHORT_TTL="${SHORT_TTL:-60}"
 
@@ -49,8 +49,10 @@ fmt() { if [ -n "$1" ]; then awk -v x="$1" -v d="$2" -v p="${3:-1}" 'BEGIN { pri
 echo "==> strategy=$STRATEGY short_ttl=${SHORT_TTL}s rate=${RATE}/s duration=$DURATION warmup=$WARMUP_DURATION edit_every=${EDIT_EVERY}s publish_every=$PUBLISH_EVERY"
 
 echo "==> Fresh containers (strategy $STRATEGY, empty Varnish cache)"
-compose up -d --force-recreate app varnish >/dev/null 2>&1
+compose up -d --build --force-recreate app varnish editor >/dev/null 2>&1
 until curl -sf -o /dev/null http://localhost:8002/; do sleep 1; done
+# Any answer means the editor listens (POST-only routes give 404 on GET).
+until curl -s -o /dev/null http://localhost:3002/; do sleep 1; done
 
 echo "==> Reseeding data"
 console app:seed -q
@@ -107,5 +109,5 @@ fi
 echo "| $STAMP | $STRATEGY | $RATE | $READER_RPS | $DROPPED | $ORIGIN_RPS | $HIT_RATIO% | $P50 | $P95 | $CPU_AVG% | $UPDATE_P95 | $PUBLISH_P95 | $TIMEOUTS |" >>"$TABLE"
 
 echo "==> Result (also appended to $TABLE)"
-echo "active strategy in app: $(compose exec -T app printenv INVALIDATION_STRATEGY)"
+echo "active strategy: app $(compose exec -T app printenv INVALIDATION_STRATEGY), editor $(compose exec -T editor printenv INVALIDATION_STRATEGY)"
 echo "strategy $STRATEGY: origin ${ORIGIN_RPS} req/s, hit ratio ${HIT_RATIO}%, p50 ${P50} ms, p95 ${P95} ms, origin CPU ${CPU_AVG}%, update visible p95 ${UPDATE_P95} s, publish visible p95 ${PUBLISH_P95} s (hits $HITS, misses $MISSES, backend requests $BACKEND over ${RUN_SECONDS}s, dropped $DROPPED, probe timeouts $TIMEOUTS)"

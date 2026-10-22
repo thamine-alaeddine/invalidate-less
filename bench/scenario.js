@@ -1,12 +1,12 @@
 // Readers browse the site through Varnish at a fixed rate while an editor updates and publishes articles
-// on the origin, then measures how long each change takes to become visible through the cache.
+// through the editor service, then measures how long each change takes to become visible through the cache.
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { check, randomSeed, sleep } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
 
 const SITE = __ENV.SITE_URL || 'http://varnish';
-const ORIGIN = __ENV.ORIGIN_URL || 'http://app';
+const EDITOR = __ENV.EDITOR_URL || 'http://editor:3000';
 // Open model: readers send RATE requests per second whatever the response times, so strategies serve the same load.
 const RATE = Number(__ENV.RATE || 1000);
 const DURATION = __ENV.DURATION || '3m';
@@ -124,7 +124,7 @@ export function editor() {
     const action = exec.scenario.iterationInTest;
 
     if (action % PUBLISH_EVERY === PUBLISH_EVERY - 1) {
-        const res = http.post(`${ORIGIN}/editor/articles`, null, { tags: { name: 'publish' } });
+        const res = http.post(`${EDITOR}/articles`, null, { tags: { name: 'publish' } });
         if (!check(res, { 'publish 201': (r) => r.status === 201 })) return;
         const slug = res.json('slug');
         probe('/', (body) => body.includes(`/article/${slug}"`), publishVisible, Date.now());
@@ -132,7 +132,7 @@ export function editor() {
     }
 
     const index = articleIndex(seededRandom(SEED * 100000 + action));
-    const res = http.post(`${ORIGIN}/editor/articles/${urls.articleIds[index]}`, null, { tags: { name: 'update' } });
+    const res = http.post(`${EDITOR}/articles/${urls.articleIds[index]}`, null, { tags: { name: 'update' } });
     if (!check(res, { 'update 200': (r) => r.status === 200 })) return;
     const revision = res.json('revision');
     // The article's own meta line is the first "rev N" on its page.
