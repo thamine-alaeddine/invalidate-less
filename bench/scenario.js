@@ -24,7 +24,7 @@ const HOT_SHARE = 0.8;
 
 const urls = JSON.parse(open('./urls.json'));
 
-// Time from the editor's successful response to the change being served by Varnish.
+// Time from the editor's successful response (event queued) to the change being served by Varnish, queue and invalidator included.
 const updateVisible = new Trend('update_visible_after', true);
 const publishVisible = new Trend('publish_visible_after', true);
 const probeTimeouts = new Counter('probe_timeouts');
