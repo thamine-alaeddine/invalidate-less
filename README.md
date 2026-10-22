@@ -1,6 +1,6 @@
 # invalidate-less
 
-A reproducible benchmark comparing **full cache purges** with **tag-based cache invalidation** on a content-heavy website, using Symfony, Varnish and a NestJS editor service.
+A reproducible benchmark comparing **full cache purges** with **tag-based cache invalidation** on a content-heavy website, using Symfony, Varnish, a NestJS editor service and a queue-driven invalidator (SQS API, Lambda-ready).
 
 > Status: 🚧 in progress. Results will be published here once the benchmarks are done.
 
@@ -42,11 +42,32 @@ A and B keep long TTLs (1 hour for articles, 1 day elsewhere) because purges kee
 ## Stack
 
 - PHP 8.3, Symfony 7, FOSHttpCacheBundle: the public site, read-only, tags its responses
-- Node 24, NestJS 11: the editor service, writes articles and invalidates Varnish (like a CMS backoffice beside its front)
+- Node 24, NestJS 11: the editor service, writes articles and queues an event per change (like a CMS backoffice beside its front)
+- An SQS queue (ElasticMQ locally, SQS-compatible) carrying CloudEvents, and an invalidator in TypeScript that consumes them and purges Varnish; it runs as a container worker locally and ships an AWS Lambda handler for the same code
 - Varnish 7 with the xkey module
 - SQLite (kept simple on purpose), shared by the site and the editor through a Docker volume
 - Docker Compose for local runs
 - k6 for load testing
+
+## Architecture
+
+```
+readers ──> Varnish ──> app (Symfony, read-only: pages, ESI listings, cache tags)
+                                      │ SQLite (shared volume)
+editor (NestJS) ──writes──────────────┘
+   └──SendMessage──> queue "article-events" ──> invalidator (worker | Lambda) ──BAN / PURGEKEYS──> Varnish
+                          └── after 5 failed attempts ──> "article-events-dlq"
+```
+
+Invalidation is asynchronous: the editor answers once the event is queued, and the "visible after" metrics include the queue and the invalidator.
+
+### Running the invalidator on another platform
+
+The invalidator's core (`invalidator/src/core/`) maps an article event to a purge and knows nothing about where it runs. Only the entry adapters differ:
+
+- **Any container platform** (ECS, Kubernetes, Fly, a VM): run the `invalidator/` image (the SQS worker). Set `QUEUE_URL`, `AWS_REGION` and credentials, and leave `SQS_ENDPOINT` unset to use real SQS.
+- **AWS Lambda**: `npm run bundle:lambda` builds `dist/lambda/index.js` (handler `index.handler`, Node 24). Add an SQS event source mapping with `ReportBatchItemFailures`, so only failed messages are retried. Varnish must be reachable from the Lambda (same VPC) and must allow the Lambda's addresses in its `invalidators` ACL.
+- **Another broker** (RabbitMQ, Pub/Sub…): events are plain CloudEvents JSON, so add an adapter that calls `handleEvent` on the editor side and on the invalidator side.
 
 ## Getting started
 
@@ -67,6 +88,7 @@ Then open:
 
 - http://localhost:8002: Symfony directly (the origin, never cached)
 - http://localhost:3002: the editor service (NestJS), which updates and publishes articles
+- http://localhost:9335: the ElasticMQ UI (queue contents); the SQS API is on port 9334
 - http://localhost:8082: the same site through Varnish
 
 Check that caching works:
@@ -111,10 +133,13 @@ Run `make` to list them all.
 | `make composer c="require foo/bar"` | Run a Composer command |
 | `make check-cache` | Show cache headers from Varnish |
 | `make seed` | Recreate the schema and seed deterministic content |
-| `make update-article id=42` | Update one article through the editor and invalidate the cache |
+| `make update-article id=42` | Update one article through the editor; the invalidator purges the cache |
 | `make editor-build` | Rebuild and restart the editor after a code change |
 | `make editor-logs` | Follow the editor's logs |
-| `make publish-article` | Publish a new article (optional `category=3 author=7`) and invalidate the listings it enters |
+| `make invalidator-build` | Rebuild and restart the invalidator after a code change |
+| `make invalidator-logs` | Follow the invalidator's logs (one line per handled event) |
+| `make queue-stats` | Messages waiting and in flight, in the queue and its DLQ |
+| `make publish-article` | Publish a new article (optional `category=3 author=7`); the invalidator purges the listings it enters |
 | `make varnish-stats` | Show Varnish hit, miss, ban and object counters |
 | `make strategy-full` | Switch to strategy A (full purge) |
 | `make strategy-tags` | Switch to strategy B (tag-based purge) |
@@ -149,7 +174,7 @@ Readers' page mix: 15% home, 20% category, 10% author, 55% article; 80% of artic
 Results print at the end and are appended to `bench/results/results.md` (raw k6 summary JSON next to it):
 
 - **Reader req/s, p50, p95**: k6, reader requests only. **Dropped** counts reader requests k6 could not start in time; if it is not 0, the target rate was too high for the machine
-- **Update / publish visible p95**: after each editor action, the editor polls the page through Varnish every 0.5 s until the change shows (the article's own page for an update, the home page's latest list for a publish) and records the delay. This is the staleness readers experience; **probe timeouts** count changes not visible within `PROBE_TIMEOUT`
+- **Update / publish visible p95**: after each editor action, the editor polls the page through Varnish every 0.5 s until the change shows (the article's own page for an update, the home page's latest list for a publish) and records the delay, measured from the editor's answer, so it includes the queue and the invalidator. The 0.5 s polling also rounds it up. This is the staleness readers experience; **probe timeouts** count changes not visible within `PROBE_TIMEOUT`
 - **Origin req/s**: Varnish `MAIN.backend_req` delta over the readers' window (page shells, ESI fragments and background refreshes)
 - **Hit ratio**: `cache_hit / (cache_hit + cache_miss)` delta, counting every ESI fragment lookup
 - **Origin CPU**: average of `docker stats` samples for the app container (100% = one core)
@@ -161,14 +186,16 @@ Results print at the end and are appended to `bench/results/results.md` (raw k6 
 ├── config/                 Symfony configuration
 ├── docker/varnish/         Varnish configuration (VCL)
 ├── public/index.php        Symfony front controller
-├── editor/                 NestJS editor service: article update/publish and cache invalidation
+├── docker/elasticmq/       Local SQS queue and its dead-letter queue
+├── editor/                 NestJS editor service: article update/publish, queues article events
+├── invalidator/            Queue consumer that purges Varnish: core, SQS worker and Lambda adapters
 ├── src/Command/            Console commands (seed, benchmark URLs)
 ├── src/Content/            Deterministic fake text generator
 ├── src/Controller/         Page controllers (home, category, author, article)
 ├── src/Entity/             Doctrine entities (Article, Category, Author)
 ├── src/Cache/              Cache tags and TTLs
 ├── templates/              Twig templates
-├── docker-compose.yml      app (Symfony on FrankenPHP), editor (NestJS), Varnish, k6 (bench profile)
+├── docker-compose.yml      app (Symfony on FrankenPHP), Varnish, editor, sqs (ElasticMQ), invalidator, k6 (bench profile)
 ├── Dockerfile              PHP image for the app
 └── Makefile                Shortcuts for common commands
 ```
