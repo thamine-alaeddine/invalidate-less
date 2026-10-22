@@ -69,6 +69,94 @@ The invalidator's core (`invalidator/src/core/`) maps an article event to a purg
 - **AWS Lambda**: `npm run bundle:lambda` builds `dist/lambda/index.js` (handler `index.handler`, Node 24). Add an SQS event source mapping with `ReportBatchItemFailures`, so only failed messages are retried. Varnish must be reachable from the Lambda (same VPC) and must allow the Lambda's addresses in its `invalidators` ACL.
 - **Another broker** (RabbitMQ, Pub/Sub…): events are plain CloudEvents JSON, so add an `ArticleEvents` adapter in the editor (`editor/src/events/`) and an entry adapter that calls `handleEvent` in the invalidator.
 
+## How each strategy works
+
+Every editor action starts the same way: the editor writes to SQLite (an update bumps the article's `revision`), queues a CloudEvent (`article.updated` or `article.published`) and answers right away. The invalidator then receives the event, and only what it does next differs. The diagrams follow an update of article 42, which is listed on the home page.
+
+### A. Full purge
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant E as Editor (NestJS)
+    participant Q as Queue (SQS)
+    participant I as Invalidator
+    participant V as Varnish
+    participant A as App (Symfony)
+    actor R as Reader
+    E->>E: UPDATE article 42 (revision + 1)
+    E->>Q: article.updated {id: 42}
+    Q->>I: event
+    I->>V: BAN X-Url ".*"
+    Note over V: every page and fragment is banned,<br/>whatever changed
+    R->>V: GET /
+    V->>A: MISS: home shell
+    V->>A: MISS: /_esi/latest fragment
+    V-->>R: fresh page (rev 2)
+    R->>V: GET /category/sports (unrelated page)
+    V->>A: MISS: shell + fragment rebuilt anyway
+    Note over V,A: after each edit, every page readers ask for<br/>goes back to the origin
+```
+
+### B. Tag-based purge
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant E as Editor (NestJS)
+    participant Q as Queue (SQS)
+    participant I as Invalidator
+    participant V as Varnish
+    participant A as App (Symfony)
+    actor R as Reader
+    E->>E: UPDATE article 42 (revision + 1)
+    E->>Q: article.updated {id: 42}
+    Q->>I: event
+    I->>V: PURGEKEYS xkey-purge: article-42
+    Note over V: removes only objects tagged article-42:<br/>its article page and the listing fragments showing it
+    R->>V: GET /
+    Note over V: HIT: home shell (untagged)
+    V->>A: MISS: /_esi/latest fragment (contained 42)
+    V-->>R: fresh page (rev 2)
+    R->>V: GET /category/sports (unrelated page)
+    V-->>R: HIT: shell and fragment untouched
+    Note over I,V: on publish the tags are list-latest,<br/>list-category-{c} and list-author-{a}
+```
+
+### TTL only (baseline)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant E as Editor (NestJS)
+    participant Q as Queue (SQS)
+    participant I as Invalidator
+    participant V as Varnish
+    participant A as App (Symfony)
+    actor R as Reader
+    E->>E: UPDATE article 42 (revision + 1)
+    E->>Q: article.updated {id: 42}
+    Q->>I: event
+    Note over I: no purge
+    R->>V: GET /
+    V-->>R: HIT: stale page (rev 1)
+    Note over V: up to 60 s later, s-maxage expires
+    R->>V: GET /
+    V-->>R: stale page, served during grace (10 s)
+    V->>A: background fetch of the fragment
+    R->>V: GET /
+    V-->>R: HIT: fresh page (rev 2)
+    Note over V,A: every page and fragment expires every minute,<br/>changed or not
+```
+
+### In short
+
+| Strategy | Purged per edit | Re-rendered by the origin afterwards | Change visible after |
+|---|---|---|---|
+| A. Full purge | the whole cache | every page and fragment readers ask for | as soon as the invalidator runs |
+| B. Tag-based | only objects tagged with the change | the article page and the fragments showing it | as soon as the invalidator runs |
+| TTL only | nothing | every page and fragment, once a minute | up to 60 s + 10 s grace |
+
 ## Getting started
 
 Requirements: Docker with Docker Compose, `make`, and `curl` + `jq` for the benchmark runner (both ship with macOS).
